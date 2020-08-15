@@ -1,12 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h> 
-#include <signal.h>
-#define TAM 256
+#include "../include/cliente.h"
 
 /*
 	declaración de variables
@@ -24,19 +16,6 @@ char buffer[TAM];
 int auth_flag = 0;
 int32_t rta;
 
-
-
-void conect_to_server();
-void signal_handler();
-void salida();
-void enviar_a_socket(int32_t socket, char* mensaje);
-int32_t login();
-void comandos();
-void enviar_comando();
-void recibir_respuesta(int32_t socket);
-void descargar();
-void conect_to_files();
-
 int main(int argc, char *argv[])
 {
 
@@ -44,10 +23,10 @@ int main(int argc, char *argv[])
 		fprintf( stderr, "Uso %s host puerto\n", argv[0]);
 		exit( 0 );
 	}
-
+	
 	/*
-		Puerto1 es por donde pasa los datos
-		Puerto2 es por donde recibe las imagenes para el pendrive
+	Puerto1 es por donde pasa los datos
+	Puerto2 es por donde recibe las imagenes para el pendrive
 	*/
 	puerto1 = atoi( argv[2] );
 	puerto2 = puerto1 + 1;
@@ -177,6 +156,7 @@ int32_t login(){
 		perror("error de alocación\n");
 		exit(1);
 	}
+	sprintf(cad_aux, "%s%s%s", usuario, " ", password);			// almacena todos los valores en cad_aux
 
 	/*
 		envío el usuario y contraseña al server y libero la memoria 

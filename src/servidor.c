@@ -1,382 +1,387 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h> 
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <signal.h>
-#include <dirent.h>
-#include <time.h>
-//#include <openssl/md5.h>
-#include <unistd.h>
-#include <errno.h>
-
-#define TAM 256
-#define USUARIO_TAM 20
-#define USUARIO_BLOQUEADO_TAM 2
-#define LIMITE_INTENTOS 3
-#define COMANDO_TAM 32
-
-#define LOGIN_ID 1
-#define LOGIN_ACCEPT 2
-#define LISTA_NOMBRES 3
-#define LISTA_NOMBRES_RESPUESTA 4
-#define PASSWORD_CHANGE 5
-#define PASSWORD_CHANGE_RESPONSE 6
-#define LISTA_ARCHIVOS 7
-#define ARCHIVOS_RESPUESTA 8
-#define DESCARGA_IMAGEN 9
-#define DESCARGA_IMAGEN_RESPONSE 10
-
-#define direccion_server "src/servidor.c"
-
-struct msgbuf {
-   long mtype;
-   char mtext[TAM];
-};
-
-int32_t send_to_queue(long id_message, char message[TAM]);
-char* recive_from_queue(long id_mensaje, int32_t flag);
+#include "../include/servidor.h"
 
 
-int32_t main( int32_t argc, char *argv[] ) {
-	int32_t sockfd, newsockfd, puerto, clilen, pid;
-	char buffer[TAM];
-	struct sockaddr_in serv_addr, cli_addr;
-	int32_t n;
-	char* mensaje_str;
-	int auth_flag = 0;	
+/*
+	declaración de variables
+	sacadas del ejemplo de socket
+	agrego auth_flag, con lo que sabré si el cliente está logueado
+*/
+int32_t sockfd, sock_cli, puerto;
+int32_t pid_auth, pid_file;
+ssize_t n;									// hubo que declarar n como ssize_t para que no pierda información al usarse en send() y recv()
+struct sockaddr_in serv_addr;
+struct sockaddr_in client_addr;
+struct hostent *server;
+struct hostent *server_file;
+int terminar;
+char buffer[TAM], direccion[20];
+int auth_flag, exit_flag;					//bandera autenticación y salida
+int32_t rta;								//respuesta del server al cliente
+uint32_t client_len;						//tamaño de la dirección del cliente
+char* mensaje_resp;
+char user[USUARIO_TAM];
+
+int32_t main( int32_t argc, char *argv[] ){
+		
 
 	if ( argc < 2 ) {
-        	fprintf( stderr, "Uso: %s <puerto>\n", argv[0] );
+		fprintf(stderr,"Uso: %s <direccion ip><puerto>\n", argv[0]);		
 		exit( 1 );
 	}
 
-	sockfd = socket( AF_INET, SOCK_STREAM, 0);
-	if ( sockfd < 0 ) { 
-		perror( " apertura de socket ");
-		exit( 1 );
-	}
+	// definicion de puerto y direccion
+	sprintf(direccion, "%s", argv[1]);
+	puerto = atoi( argv[2] );
 
-	memset( (char *) &serv_addr, 0, sizeof(serv_addr) );
-	puerto = atoi( argv[1] );
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons( puerto );
+	configurar_socket();
 
-	if ( bind(sockfd, ( struct sockaddr *) &serv_addr, sizeof( serv_addr ) ) < 0 ) {
-		perror( "ligadura" );
-		exit( 1 );
-	}
+    printf( "Proceso: %d - socket disponible: %d\n", getpid(), ntohs(serv_addr.sin_port) );
 
-        printf( "Proceso: %d - socket disponible: %d\n", getpid(), ntohs(serv_addr.sin_port) );
-
-	listen( sockfd, 5 );
-	clilen = sizeof( cli_addr );
-
-	pid = fork();
-  		if ( pid == 0 ) {
-    		if( execv("bin/auth",  argv) == -1 ) {
-   			  perror("error en auth ");
-   			  exit(1);
-   			}    			
-   			exit(0);
-  		}
-  		pid = fork();
-  		if ( pid == 0 ) {
-    		if( execv("bin/file",  argv) == -1 ) {
-   			  perror("error en file ");
-   			  exit(1);
-   			}    			
-   			exit(0);
-  		}
+    escuchando();		//escucha por si se conecta un cliente
+	
+    ejecutar_bin();		//ejecuta los binarios de auth y file
+	
 
 	while( 1 ) {
-		newsockfd = accept( sockfd, (struct sockaddr *) &cli_addr, &clilen ); //conexión con el cliente 
-		if ( newsockfd < 0 ) {
-			perror( "accept" );
-			exit( 1 );
-		}
-		char user[USUARIO_TAM];
-		
-  		
+		conectar_cliente();
 
-		pid = fork(); 
-		if ( pid < 0 ) {
-			perror( "fork" );
-			exit( 1 );
-		}
+		exit_flag = 0;
+		auth_flag = 0;
 
-		if ( pid == 0 ) {  // Proceso hijo
-			close( sockfd );
+		if(auth_flag == 0){
+			printf("autenticando\n");
 
-			while ( 1 ) {
-				memset( buffer, 0, TAM );
-					n = read( newsockfd, buffer, TAM-1 );		//recepción de usuario y contraseña por parte del cliente en caso de auth_flag=0
-					if ( n < 0 ) {								//recepción de comandos en caso de auth_flag=1
-						perror( "lectura de socket" );
-						exit(1);
-					}
+			rec_user();				//recibo credenciales de usuario
 
-					if( strcmp(buffer, "exit\n") == 0 ) {
-						printf("Saliendo...\n");
-						break;
-					}
-
-				if(auth_flag == 0){
-					
-					if(send_to_queue((long) LOGIN_ID, buffer) == -1) {
-						printf("error enviando mensaje\n");
-						exit(1);
-					}
-
-					mensaje_str = recive_from_queue(LOGIN_ACCEPT, 0);
-
-
-				
-					if( mensaje_str[0] == '0') {					//si auth dice "0", es que el usuario está bloqueado
-						char* nombre = strtok(buffer, "-");
-						printf("USUARIO BLOQUEADO: %s\n", nombre);
-						n = write( newsockfd, "0", 18 );			//y le mando a cleinte el código "0" que indica bloqueado
-						if ( n < 0 ) {
-							perror( "escritura en socket" );
-							exit( 1 );
-						}
-						auth_flag=0;
-					}
-					else if(mensaje_str[0] == '1') {
-						sprintf(user, "%s", strtok(buffer, "-"));
-						printf("USUARIO ACEPTADO: %s\n", user);
-						n = write( newsockfd, "1", 18 );			//y le mando a cleinte el código "0" que indica bloqueado
-						if ( n < 0 ) {
-							perror( "escritura en socket" );
-							exit( 1 );
-						}
-						auth_flag=1;
-					}
-					else{
-						char* nombre = strtok(buffer, "-");
-						printf("ERROR DE AUTENTICACIÓN: %s\n", nombre);
-						n = write( newsockfd, "2", 18 );			//y le mando a cleinte el código "0" que indica bloqueado
-						if ( n < 0 ) {
-							perror( "escritura en socket" );
-							exit( 1 );
-						}
-						auth_flag=0;
-					}
-				}
-				else{
-					buffer[strlen(buffer)-1] = '\0';
-
-					char* mensaje;
-					char opcion[COMANDO_TAM];
-					char argumento[COMANDO_TAM];
-					char comando[COMANDO_TAM];
-
-					int32_t i = 0;
-
-					mensaje = strtok(buffer, " ");
-					sprintf(opcion, " ");
-					sprintf(argumento, " ");
-
-					while(mensaje != NULL) {
-						if(i == 0) {
-							sprintf(comando, "%s", mensaje);
-							i++;
-						}
-						else if(i == 1) {
-							sprintf(opcion, "%s", mensaje);
-							i++;
-						}
-						else {
-							sprintf(argumento, "%s", mensaje)	;
-							break;
-						}
-						mensaje = strtok(NULL, " ");
-					}
-
-					printf( "%s - %s %s %s\n", user, comando, opcion, argumento);
-
-					if( strcmp("exit", comando) == 0 ){
-						printf("Usuario salió\n");
-						break;
-					}
-					else if( strcmp("user", comando) == 0 ){
-						//lista de usarios y última conexión
-						if( strcmp("ls", opcion) == 0 ){								
-							if(send_to_queue((long) LISTA_NOMBRES, "nombres") == -1) {
-								printf( "error enviando mensaje\n");
-								exit(1);
-							}
-							mensaje_str = recive_from_queue(LISTA_NOMBRES_RESPUESTA, 0); // respuesta de auth_service
-
-							char respuesta_envio[strlen(mensaje_str)];
-							if(respuesta_envio == NULL) {
-								printf("error alocando memoria\n");
-								exit(1);
-							}
-							sprintf(respuesta_envio, "%s", mensaje_str);
-
-							n = write( newsockfd, respuesta_envio, 18 );			//le envío la respuesta del auth al cliente
-								if ( n < 0 ) {
-									perror( "escritura en socket" );
-									exit( 1 );
-								}
-						}
-						//cambiar clave
-						else if( strcmp("passwd", opcion) == 0 && strcmp(" ", argumento) != 0)	
-							if( strlen(argumento) == 0 || strlen(argumento) > USUARIO_TAM) {	
-								n = write( newsockfd, "clave invalida\n", 18 );			
-								if ( n < 0 ) {
-									perror( "escritura en socket" );
-									exit( 1 );
-								}
-							}
-							char* guion = "-";
-							char temp[strlen(user) + strlen(argumento) + strlen(guion)];
-							sprintf(temp,"%s%s%s", user, guion, argumento);
-							if(send_to_queue((long) PASSWORD_CHANGE, temp) == -1) {
-								printf("error enviando mensaje\n");
-								exit(1);
-							}
-							recive_from_queue((long) PASSWORD_CHANGE_RESPONSE, 0);
-
-							n = write( newsockfd, "Se ha modificado la clave\n", 18 );			
-								if ( n < 0 ) {
-									perror( "escritura en socket" );
-									exit( 1 );
-								}
-
-						else {
-							n = write( newsockfd, " Comandos válidos: \n"
-												"user [opcion] <argumento>\n\n"
-												"	- ls : listado de usuarios\n"
-												"	- passwd <nueva contraseña> : cambio de contraseña", 18 );			
-								if ( n < 0 ) {
-									perror( "escritura en socket" );
-									exit( 1 );
-								}
-						}
-					}
-					else if( strcmp("file", comando) == 0 ){
-						if( strcmp("ls", opcion) == 0 )
-							if(send_to_queue((long) LISTA_ARCHIVOS, "i") == -1) {
-									printf("error enviando mensaje\n");
-									exit(1);
-								}
-							mensaje_str = recive_from_queue(ARCHIVOS_RESPUESTA, 0);
-							char respuesta_envio[strlen(mensaje_str)];
-
-							sprintf(respuesta_envio, "%s", mensaje_str);
-
-							n = write( newsockfd, respuesta_envio, 18 );			
-								if ( n < 0 ) {
-									perror( "escritura en socket" );
-									exit( 1 );
-								}
-
-						else if( strcmp("down", opcion) == 0 && strcmp(" ", argumento) != 0){
-							if(send_to_queue((long) DESCARGA_IMAGEN, argumento) == -1) {
-										printf("error enviando mensaje\n");
-										exit(1);
-							}
-							mensaje_str = recive_from_queue(DESCARGA_IMAGEN_RESPONSE, 0);
-
-							char respuesta_envio[strlen(mensaje_str)];
-							sprintf(respuesta_envio, "%s", mensaje_str);
-
-							n = write( newsockfd, respuesta_envio, 18 );			
-								if ( n < 0 ) {
-									perror( "escritura en socket" );
-									exit( 1 );
-								}
-							}
-
-						else {
-							n = write( newsockfd, " Comandos válidos: \n"
-												"file [opcion] <argumento>\n\n"
-												"	- ls : listado de archivos\n"
-												"	- down <nombre_archivo> : descarga el archivo", 18 );			
-								if ( n < 0 ) {
-									perror( "escritura en socket" );
-									exit( 1 );
-								}
-						}
-					}
-					else{
-						n = write( newsockfd, " Comandos inválido: \n"
-											  " Comandos válidos: \n"
-												"user \n"
-												"file \n"
-												"exit", 18 );			
-							if ( n < 0 ) {
-								perror( "escritura en socket" );
-								exit( 1 );
-							}
-					}
-
-
-				}
+			if( strcmp(buffer, "exit\n") == 0 ) {	//si pongo exit, sale
+				printf("Saliendo...\n");
+				break;
 			}
-				
+					
+			send_to_queue((long) LOGIN_REQUEST, &buffer[0]); // reenvio a auth_service
+			mensaje_resp = recive_from_queue(LOGIN_RESPONSE, 0); //respuesta de auth_sevice
+
+			verificar_respuesta(); //acá se si se logueo, no o está bloqueado
+			
+		}
+		else{
+			while(exit_flag==0){
+				rec_user();
+				middle();			// recibe comandos del user
+			}
+
+		}
 	}
+				
+		
 	exit(0); 
-} 
-}
-
-int32_t get_queue() {
-
-  key_t key;
-  key = ftok(direccion_server, 66);								// proj_id = 66
-
-  if (key == -1) {
-    perror("error obteniendo token");
-    exit(1);
-  }
-
-  return msgget(key, 0666 | IPC_CREAT);							//para conseguir el file descriptor, uso la key y la otra parte
-  																// 0666 me da permiso y IPC_CREAT crea el espacio de memoria
-}
-
-int32_t send_to_queue(long id_message, char message[TAM]) {		//id_message es el tipo de mensaje y message es el mensaje en si
-
-  if(strlen(message) > TAM) {
-    perror("mensaje muy grande\n");
-    exit(1);
-  }
-  struct msgbuf mensaje_str;
-  mensaje_str.mtype = id_message;
-  sprintf(mensaje_str.mtext, "%s", message);
-  return msgsnd(get_queue(), &mensaje_str, sizeof mensaje_str.mtext, 0 );
-}
-
-char* recive_from_queue(long id_message, int32_t flag) {		//id_message es el tipo de mensaje y flag lo uso para recibir
-  errno = 0;
-  struct msgbuf mensaje_str = {id_message, {0}};
-
-  if(msgrcv(get_queue(), &mensaje_str, sizeof mensaje_str.mtext, id_message, flag) == -1) {
-      if(errno != ENOMSG) {
-        perror("error recibiendo mensaje de cola");
-        exit(1);
-      }
-  }
-  char* mensaje = malloc(strlen(mensaje_str.mtext));
-  sprintf(mensaje, mensaje_str.mtext);
-  return mensaje;
 }
 
 
+/*
+	Abro socket para que se conecte un cliente
+ */
+void configurar_socket() {
+	sockfd = socket( AF_INET, SOCK_STREAM, 0);
+	memset( (char *) &serv_addr, 0, sizeof(serv_addr) );
+
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = inet_addr(direccion);
+	serv_addr.sin_port = htons( (uint16_t) puerto );
+	if ( bind(sockfd, ( struct sockaddr *) &serv_addr, sizeof( serv_addr ) ) < 0 ) {
+		printf("Error de conexión\n");
+		exit(1);
+	}
+}
+
+/*
+	Abre conexión para que se conecte un clietne
+*/
+void escuchando(){
+	listen(sockfd, 1);
+	client_len = sizeof(client_addr);
+}
+
+/*
+	inicializa los procesos de autenticación y archivos
+*/
+void ejecutar_bin(){
+	pid_auth = fork();
+  		if ( pid_auth == 0 ) {
+  			#ifdef fg
+    		if( execv(AUTH_PATH, NULL) == -1 ) {
+   			  perror("error en auth ");
+   			  exit(1);
+   			}
+   			#endif    			
+   			exit(0);
+  		}
+  	pid_file = fork();
+  		if ( pid_file == 0 ) {
+  			#ifdef fh
+    		if( execv(FILE_PATH, NULL) == -1 ) {
+   			  perror("error en file ");
+   			  exit(1);
+   			}
+   			#endif    			
+   			exit(0);
+  		}
+}
+
+/*
+	Conecta con el cliente que usó su dirección
+*/
+void conectar_cliente(){
+	sock_cli = accept( sockfd, (struct sockaddr *) &client_addr, &client_len ); 
+	if ( sock_cli < 0 ) {
+		perror( "accept" );
+		exit( 1 );
+	}
+}
+
+/*
+	Recibe el usuario y contraseña desde cliente
+*/
+void rec_user(){
+	memset( buffer, 0, TAM );
+	n = recv( sock_cli, buffer, TAM, 0 );	
+	if ( n < 0 ) {								
+		perror( "lectura de socket" );
+		exit(1);
+		}
+}
+
+/*
+	Envía mesnaje a la cola de mensaje
+*/
+void enviar_a_cola_local(long id, char mensaje[MENSAJE_TAM]) {
+	if(send_to_queue(id, mensaje) == -1) {
+		printf("error enviando mensaje\n" );
+		exit(1);
+	}
+}
+
+/*
+	Envía datos hacia el cliente. Usado para respuestas de login y comandos
+*/
+void enviar_a_cliente(char* mensaje) {
+	n = send( sock_cli, mensaje, strlen(mensaje), 0 );
+	if ( n < 0 ) {
+		printf("error enviando a cliente\n" );
+	  	exit( 1 );
+	}
+}
+
+/*
+	Verifica la respuesta. Ve si hay un 0 (credenciales fallidas), 
+	1 (usuario logueado) o 2 (usuario bloqueado)
+*/
+void verificar_respuesta(){
+	if( mensaje_resp[0] == '0') {					//si auth dice "0", es que el usuario está bloqueado
+		char* nombre = strtok(buffer, "-");
+		printf("INTENTO FALLIDO: %s\n", nombre);
+		printf("Revise que este bien escrito\n");
+		enviar_a_cliente("0");
+		auth_flag=0;
+	}
+	else if(mensaje_resp[0] == '1') {				//si se loguea, guarda el user para comandos
+		sprintf(user, "%s", strtok(buffer, "-"));
+		printf("USUARIO ACEPTADO: %s\n", user);
+		enviar_a_cliente("1");
+		auth_flag=1;
+	}
+	else{											//si auth sale bloqueado, notifica al server
+		char* nombre = strtok(buffer, "-");
+		printf("USUARIO BLOQUEADO: %s\n", nombre);
+		enviar_a_cliente("2");
+		auth_flag=0;
+	}
+}
+
+/*
+	Obtiene e comando a enviar y funciona como intermediario
+*/
+void middle(){
+	buffer[strlen(buffer)-1]='\0'; //coloca un salto de linea al final del comando
+
+	/*
+	variables que usa para guardar comandos, opciones y argumentos
+	*/
+	char* mensaje_comando;
+	char comando[COMANDO_TAM];
+	char opcion[COMANDO_TAM];
+	char argumento[COMANDO_TAM];
+
+	//separa el comando en tokens para valuar
+	mensaje_comando = strtok(buffer, " ");
+
+	for(int32_t i=0; mensaje_comando != NULL; i++){
+		if(i == 0){
+			sprintf(comando, "%s", mensaje_comando);
+		}
+		else if(i == 1){
+			sprintf(opcion,"%s", mensaje_comando);
+		}
+		else{
+			sprintf(argumento,"%s",mensaje_comando);
+		}
+
+		mensaje_comando = strtok(NULL," ");
+	}
+
+	printf("%s - %s %s %s\n", user, comando, opcion, argumento );
+
+	validar_comando(&comando,&opcion,&argumento);
+}	
+
+/*
+	Revisa si el comando es exit, user o file.
+	Exit: invoca exit_command y sale del sistema
+	User: invoca user_command para listado o cambio de pass
+	File: invoca file_command para listado o descarga
+	Sino, avisa que el comando no existe
+*/
+void validar_comando(char *a, char *b, char *c){
+
+	if( strcmp("exit", a) == 0 ){
+		exit_command();
+	}
+	else if( strcmp("user", a) == 0 ){
+		user_command(b, c);
+	}
+	else if( strcmp("file", a) == 0 ){
+		file_command(b, c);
+	}
+	else{
+		unknown_command();
+	}
+}
+
+/*
+	Lo emplea para avisar que el usuario se desconecta
+	y cambia la bandera salida para que salga del bucle en el main
+*/
+void exit_command() {
+	printf("El usuario %s se ha desconectado\n", user );
+	exit_flag = 1;
+}
+
+/*
+	Verifica si el user pide el listado (ls) o 
+	cambiar password (passwd)
+	De lo contrario, avisa que está mal
+*/
+void user_command( char *opcion, char *argumento) {
+	if( strcmp("ls", opcion) == 0 ){
+		user_ls();
+	}
+	else if( strcmp("passwd", opcion) == 0 && strcmp(" ", argumento) != 0){
+		user_passwd(argumento);
+	}
+	else {
+		enviar_a_cliente(	" Opción Incorrecta\n"
+							" Escriba: user [opcion] <argumento>\n"
+							"	- ls : listado de usuarios\n"
+							"	- passwd <nueva contraseña> : cambio de contraseña");
+	}
+}
+
+/*
+	Envía a la cola local la petición del listado a auth_service y 
+	recibe la respuesta.
+	Si es correcta, la transmite al cliente.
+*/
+void user_ls() {
+	send_to_queue((long) NAMES_REQUEST, "LISTA DE NOMBRES");
+	mensaje_resp = recive_from_queue(NAMES_RESPONSE, 0); 
+
+	char respuesta_envio[strlen(mensaje_resp)];
+	if(respuesta_envio == NULL) {
+		printf("Error alocando memoria\n");
+		exit(1);
+	}
+	sprintf(respuesta_envio, "%s", mensaje_resp);
+	enviar_a_cliente(respuesta_envio);
+
+}
+
+/*
+	Verifica que la clave sea válida y la envía a auth_sevice
+*/
+void user_passwd(char* clave) {
+
+	if( strlen(clave) < 5 || strlen(clave) > CLAVE_TAM) {
+		enviar_a_cliente("Clave invalida");
+		return;
+	}
+
+	char* cad_aux = malloc(strlen(user) + strlen(clave) + strlen(" "));
+	sprintf(cad_aux,"%s%s%s", user, " ", clave);
+
+	send_to_queue((long) PASSWORD_CHANGE, "CAMBIAR CLAVE");
+	recive_from_queue((long) PASSWORD_CHANGE_RESPONSE, 0);
+
+	enviar_a_cliente("Clave cambiada con exito");
+}
+
+/*
+	Verifica si el user quiere ver el listado de archivos o si quiere descargar.
+	Si no es ninguna de estas opciones, notifica que es incorrecto.
+*/
+void file_command(char *opcion, char *argumento) {
+	if( strcmp("ls", opcion) == 0 ){
+		file_ls();
+	}
+	else if( strcmp("down", opcion) == 0 && strcmp(" ", argumento) != 0){
+		file_down(argumento);
+	}
+	else {
+		enviar_a_cliente(	" Opción Incorrecta\n"
+							" Escriba: file [opcion] <argumento>\n"
+							"	- ls : listado de archivos\n"
+							"	- down <nombre_archivo> : descarga de archivo");
+	}
+}
 
 
+/*
+	Solicita al file_service la lista de imagenes
+*/
+void file_ls(){
+	send_to_queue((long) FILES_REQUEST, "LISTA DE ARCHIVOS");
+	mensaje_resp = recive_from_queue(FILES_RESPONSE, 0);
 
+	envio_mensaje_aux();
+}
 
+/*
+	Le envía al file_service el archivo que quiere descargar
+*/
+void file_down(char* archivo_nombre) {
+	send_to_queue((long) DOWNLOAD_REQUEST, archivo_nombre);
+	mensaje_resp = recive_from_queue(DOWNLOAD_RESPONSE, 0);
 
+	envio_mensaje_aux();
+	
+}
 
+/*
+	Guarda la respuesta del buffer y la envía al cliente
+*/
+void envio_mensaje_aux(){
+	char respuesta_envio[strlen(mensaje_resp)];
+	sprintf(respuesta_envio, "%s", mensaje_resp);
+	enviar_a_cliente(respuesta_envio);
+}
 
-
-
-
+/*
+	Si el comando es incorrecto, envía un mensaje al cliente
+	con los comandos válidos
+*/
+void unknown_command() {
+	enviar_a_cliente(	"Comando no reconocido\n"
+						"Comandos aceptados:\n"
+						"	- user\n"
+						"	- file\n"
+						"	- exit");
+}
