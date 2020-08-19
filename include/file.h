@@ -1,6 +1,6 @@
 #include "../include/recursos.h"
 
-#define IMAGES_PATH "recursos/img/"
+#define IMAGES_PATH "../archivos/cosa/"
 
 void configurar_socket();
 void Lista_de_archivos();
@@ -8,12 +8,15 @@ void archivos_error(int32_t);
 void guardar_datos(int32_t,struct dirent*,char*);
 void calc_size(int32_t,char*);
 void escuchando();
-void liste_user();
+void listen_user();
 void files_request();
 void download_request();
 void conectar_cliente();
-void enviar_archivo(int32_t );
+void conectar_enviar(int32_t );
 void enviar_a_cliente(char* );
+void enviar_archivo(int32_t );
+void verificar_path(char* );
+void enviar_a_cliente_archivo(char* path);
 
 /*
 	La estructura que guardará la información de las imágenes

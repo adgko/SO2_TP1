@@ -36,7 +36,7 @@ void leer_bd() {
       	fclose(file);
  	}
 	else{
-		printf("%sError al Leer la Base de Datos\n", KRED);
+		printf("%sError al Leer la Base de Datos%s\n", KRED,KNRM);
 		exit(1);
 	}
 	/*
@@ -47,7 +47,7 @@ void leer_bd() {
 		int32_t usuario_index = i;
 		usuarios[usuario_index] = malloc(sizeof(Usuario));
 		if(usuarios[usuario_index] == NULL) {
-			printf("Error alocando memoria en usuarios\n");
+			printf("%sError alocando memoria en usuarios%s\n",KRED,KNRM);
 			exit(1);
 		}
 
@@ -87,6 +87,7 @@ void listen_user(){
 		names_request();
 	}
 
+	// el server solicita un cambio de contraseña
 	mensaje = recive_from_queue((long)PASSWORD_CHANGE,MSG_NOERROR | IPC_NOWAIT);
 	if(errno != ENOMSG){
 		password_change();
@@ -97,31 +98,37 @@ void listen_user(){
 	guarda las credenciales y las usa para logearse 
 */
 void login_request(){
-	printf("LOGIN_REQUEST %s\n", mensaje);
+	printf("%sLOGIN_REQUEST %s%s\n", KCYN,mensaje,KNRM);
 
 		char credenciales[strlen(mensaje)];
 		char p[TAM];
 		if(credenciales == NULL){
-			printf("Error alocando memoria\n");
+			printf("%sError alocando memoria%s\n",KRED,KNRM);
 			exit(1);
 		}
 		sprintf(credenciales,"%s",mensaje);
+		printf("%s\n",credenciales );
 
 		int32_t log = login(credenciales);
 
+		printf("Soco1\n" );
+
 		char rta = verificar_log(&log);
+
+		printf("Soco2\n" );
 
 		send_to_queue((long)LOGIN_RESPONSE,&rta);
 
 		//printf("LOGIN_RESPONSE: %c\n", rta);
 		sprintf(p,"LOGIN_RESPONSE: %s\n",&rta);
-		printf("%s",p);
+		printf("%s%s%s",KCYN,p,KNRM);
 }
 
 /*
 	loguea con las credenciales del usuario
 */
 int32_t login(char* credenciales){
+	
 	char* login;
 
 	login = strtok(credenciales, " ");
@@ -176,6 +183,8 @@ char verificar_log(int32_t* log){
 	ultima conexión
 */
 void names_request(){
+	
+	printf("%s2%s",KMAG,KNRM);
 
 	char* encabezado = "[Usuario] - [Bloqueado] - [Ultima conexion]\n";
 	size_t size = strlen(encabezado);
@@ -192,7 +201,7 @@ void names_request(){
 	}
 	char credenciales[size];
 	if(credenciales == NULL){
-		printf("Error alocando memoria\n");
+		printf("%sError alocando memoria%s\n",KRED,KNRM);
 		exit(1);
 	}
 	sprintf(credenciales,"%s",encabezado);
@@ -220,9 +229,11 @@ void names_request(){
 */
 void password_change(){
 
+	printf("%s3%s",KMAG,KNRM);
+
 	char credenciales[strlen(mensaje)];
 	if(credenciales == NULL){
-		printf("Error alocando memoria\n");
+		printf("%sError alocando memoria%s\n",KRED,KNRM);
 		exit(1);
 	}
 	sprintf(credenciales,"%s",mensaje);

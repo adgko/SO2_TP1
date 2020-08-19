@@ -21,7 +21,8 @@ int32_t main(){
 
 	while(1){
 
-		liste_user();
+		listen_user();
+		sleep(TIME_SLEEP);
 	}
 
 	exit(0);
@@ -38,7 +39,7 @@ void configurar_socket() {
 	serv_addr.sin_addr.s_addr = inet_addr(direccion);
 	serv_addr.sin_port = htons( (uint16_t) puerto );
 	if ( bind(sockfd, ( struct sockaddr *) &serv_addr, sizeof( serv_addr ) ) < 0 ) {
-		printf("%sError de conexión\n",KRED);
+		printf("%sError de conexión%s\n",KRED,KNRM);
 		exit(1);
 	}
 }
@@ -54,29 +55,30 @@ void Lista_de_archivos(){
     int32_t i = 0;
 
     d = opendir(IMAGES_PATH);
-    if(d = NULL){
-    	printf("%sError leyendo archivo\n", KRED);
-    	exit(1);
+    if(d != NULL){			
+    	while ((dir = readdir(d)) != NULL){
+        	if(dir->d_name[0] != '.'){
+           		//asignar espacio en el arreglo
+            	archivos[i]=malloc(sizeof(Archivo));
+            	archivos_error(i);
+
+            	//crea el path con el path que tiene y el nombre del archivo
+            	char path[strlen(IMAGES_PATH) + strlen(dir->d_name) + 1];
+				sprintf(path, "%s%s", IMAGES_PATH, dir->d_name);
+				path[strlen(path)] = '\0';
+
+				guardar_datos(i,dir,path);
+				i++;
+			}
+
+    	}
     }
     else{
-
-        while ((dir = readdir(d)) != NULL){
-            //asignar espacio en el arreglo
-            archivos[i]=malloc(sizeof(Archivo));
-            archivos_error(i);
-
-            //crea el path con el path que tiene y el nombre del archivo
-            char path[strlen(IMAGES_PATH) + strlen(dir->d_name) + 1];
-			sprintf(path, "%s%s", IMAGES_PATH, dir->d_name);
-			path[strlen(path)] = '\0';
-
-			guardar_datos(i,dir,path);
-			i++;
-
+    	printf("%sError leyendo directorio%s\n", KRED,KNRM);
+    	exit(1);
         }
 
         closedir(d);
-    }
 }
 
 /*
@@ -84,7 +86,7 @@ void Lista_de_archivos(){
 */
 void archivos_error(int32_t i){
 	if(archivos[i] == NULL){
-		printf("%sError alocando memoria\n", KRED);
+		printf("%sError alocando memoria%s\n", KRED,KNRM);
 		exit(1);
 	}
 }
@@ -139,7 +141,7 @@ void escuchando(){
 	para que si no hay mensajes en la cola, errno=ENOMSG y sigue la ejecución
 	preguntando por el siguiente tipo de mensaje
 */
-void liste_user(){
+void listen_user(){
 
 	//el server solicita la lista de archivos
 	mensaje_resp = recive_from_queue((long)FILES_REQUEST,MSG_NOERROR|IPC_NOWAIT);
@@ -151,12 +153,15 @@ void liste_user(){
 	if(errno != ENOMSG){
 		download_request();
 	}
+
 }
 /*
 	Va almacenando en un buffer todo el contenido del arreglo archivos,
 	los ordena en una tabla y luego los envía a la cola como respuesta
 */
 void files_request(){
+
+	printf("%s4%s",KMAG,KNRM);
 
 	char* encabezado = "[Indice] - [Nombre] - [Formato] - [Tamaño (MB)] - [Hash]\n";
 	size_t size = strlen(encabezado);
@@ -192,6 +197,9 @@ void files_request(){
 	envía dicho archivo
 */
 void download_request(){
+
+	printf("%s5%s",KMAG,KNRM);
+
 	int32_t flag = 0;
 	int32_t indice_archivo = 0;
 	//busca que archivo matchea el nombre con el buscado
@@ -203,14 +211,14 @@ void download_request(){
 	}
 
 	if(flag == 0){
-		printf("%sNo se encontró el archivo\n", KYEL);
+		printf("%sNo se encontró el archivo%s\n", KYEL,KNRM);
 		send_to_queue((long)DOWNLOAD_RESPONSE,"descarga_no");
 	}
 	else{
-		printf("%sArchivo encontrado\n", KGRN);
+		printf("%sArchivo encontrado%s\n", KGRN,KNRM);
 		send_to_queue((long)DOWNLOAD_RESPONSE,"descarga_si");
 
-		enviar_archivo(indice_archivo);
+		conectar_enviar(indice_archivo);
 
 	}
 }
@@ -218,10 +226,10 @@ void download_request(){
 /*
 	Abre un socket al cliente, envía el archivo al cliente y luego cierra conexión
 */
-void enviar_archivo(int32_t indice_archivo){
+void conectar_enviar(int32_t indice_archivo){
 
 	conectar_cliente();
-	//enviar_a_cliente(indice_archivo);
+	enviar_archivo(indice_archivo);
 	close(sock_cli);
 
 }
@@ -238,12 +246,65 @@ void conectar_cliente(){
 }
 
 /*
+	
+*/
+void enviar_archivo(int32_t i){
+
+	//guarda en un buffer el nombre y formato del archivo, separado por un punto
+	// para poder encontrarlo en el directorio
+	char* punto = ".";
+	char archivo[strlen(archivos[i]->nombre) + strlen(punto) + strlen(archivos[i]->formato)];
+	sprintf(archivo,"%s%s%s",archivos[i]->nombre,punto,archivos[i]->formato);
+	archivo[strlen(archivo)] = '\0';
+
+	enviar_a_cliente(archivo);
+
+	//crea el path donde va a buscar dicho archivo
+	char* path = malloc(strlen(IMAGES_PATH) + strlen(archivo));
+	verificar_path(path);
+	sprintf(path,"%s%s",IMAGES_PATH,archivo);
+	path[strlen(path)] = '\0';
+
+
+	enviar_a_cliente_archivo(path);
+}
+
+/*
 	Envía datos hacia el cliente. Usado para respuestas de login y comandos
 */
 void enviar_a_cliente(char* mensaje) {
 	n = send( sock_cli, mensaje, strlen(mensaje), 0 );
 	if ( n < 0 ) {
-		printf("error enviando a cliente\n" );
+		printf("%sError enviando a cliente%s\n",KRED,KNRM );
 	  	exit( 1 );
 	}
+}
+
+/*
+	Revisa si la memoria se alocó correctamente 
+*/
+void verificar_path(char* path){
+	if(path == NULL){
+		printf("%sError alocando memoria%s\n", KRED,KNRM);
+		exit(1);
+	}
+}
+
+
+void enviar_a_cliente_archivo(char* path){
+
+	FILE* file = fopen(path, "rb"); //rb porque son archivos sin texto
+	if(file != NULL){
+		while(fread(buffer, sizeof(char),sizeof(buffer), file) > 0){
+			n = send(sock_cli, buffer, sizeof(buffer),0);
+			if(n < 0){
+				printf("%sError enviando al cliente%s\n", KYEL,KNRM);
+			}
+		}
+	fclose(file);	
+	}
+	else{
+		printf("%sError enviando al cliente%s\n", KRED,KNRM);
+	}
+	free(path);
 }

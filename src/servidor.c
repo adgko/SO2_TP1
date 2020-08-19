@@ -34,12 +34,31 @@ int32_t main( int32_t argc, char *argv[] ){
 	puerto = atoi( argv[2] );
 
 	configurar_socket();
+	
 
     printf( "Proceso: %d - socket disponible: %d\n", getpid(), ntohs(serv_addr.sin_port) );
 
     escuchando();		//escucha por si se conecta un cliente
 	
-    ejecutar_bin();		//ejecuta los binarios de auth y file
+    //ejecutar_bin();		//ejecuta los binarios de auth y file
+    
+    pid_auth = fork();
+  		if ( pid_auth == 0 ) {
+    		if( execv(AUTH_PATH, argv) == -1 ) {
+   			  perror("error en auth ");
+   			  exit(1);
+   			} 			
+   			exit(0);
+  		}
+
+  	pid_file = fork();
+  		if ( pid_file == 0 ) {
+    		if( execv(FILE_PATH, argv) == -1 ) {
+   			  perror("error en file ");
+   			  exit(1);
+   			}   			
+   			exit(0);
+		}
 	
 
 	while( 1 ) {
@@ -49,12 +68,12 @@ int32_t main( int32_t argc, char *argv[] ){
 		auth_flag = 0;
 
 		if(auth_flag == 0){
-			printf("autenticando\n");
+			printf("%sautenticando%s\n",KGRN,KNRM);
 
 			rec_user();				//recibo credenciales de usuario
 
 			if( strcmp(buffer, "exit\n") == 0 ) {	//si pongo exit, sale
-				printf("Saliendo...\n");
+				printf("%sSaliendo...%s\n",KBLU,KNRM);
 				break;
 			}
 					
@@ -105,29 +124,26 @@ void escuchando(){
 /*
 	inicializa los procesos de autenticación y archivos
 */
+/*
 void ejecutar_bin(){
 	pid_auth = fork();
   		if ( pid_auth == 0 ) {
-  			#ifdef fg
-    		if( execv(AUTH_PATH, NULL) == -1 ) {
+    		if( execv(AUTH_PATH, (char* const*)NULL) == -1 ) {
    			  perror("error en auth ");
    			  exit(1);
-   			}
-   			#endif    			
+   			} 			
    			exit(0);
   		}
   	pid_file = fork();
   		if ( pid_file == 0 ) {
-  			#ifdef fh
-    		if( execv(FILE_PATH, NULL) == -1 ) {
+    		if( execv(FILE_PATH, (char* const*)NULL) == -1 ) {
    			  perror("error en file ");
    			  exit(1);
-   			}
-   			#endif    			
+   			}   			
    			exit(0);
-  		}
+		}
 }
-
+*/
 /*
 	Conecta con el cliente que usó su dirección
 */
@@ -156,7 +172,7 @@ void rec_user(){
 */
 void enviar_a_cola_local(long id, char mensaje[MENSAJE_TAM]) {
 	if(send_to_queue(id, mensaje) == -1) {
-		printf("error enviando mensaje\n" );
+		printf("%serror enviando mensaje%s\n", KRED, KNRM );
 		exit(1);
 	}
 }
@@ -167,7 +183,7 @@ void enviar_a_cola_local(long id, char mensaje[MENSAJE_TAM]) {
 void enviar_a_cliente(char* mensaje) {
 	n = send( sock_cli, mensaje, strlen(mensaje), 0 );
 	if ( n < 0 ) {
-		printf("error enviando a cliente\n" );
+		printf("%serror enviando a cliente%s\n",KRED,KNRM );
 	  	exit( 1 );
 	}
 }
@@ -179,20 +195,20 @@ void enviar_a_cliente(char* mensaje) {
 void verificar_respuesta(){
 	if( mensaje_resp[0] == '0') {					//si auth dice "0", es que el usuario está bloqueado
 		char* nombre = strtok(buffer, "-");
-		printf("INTENTO FALLIDO: %s\n", nombre);
-		printf("Revise que este bien escrito\n");
+		printf("%sINTENTO FALLIDO: %s%s\n", KYEL,nombre,KNRM);
+		printf("%sRevise que este bien escrito%s\n",KYEL,KNRM);
 		enviar_a_cliente("0");
 		auth_flag=0;
 	}
 	else if(mensaje_resp[0] == '1') {				//si se loguea, guarda el user para comandos
 		sprintf(user, "%s", strtok(buffer, "-"));
-		printf("USUARIO ACEPTADO: %s\n", user);
+		printf("%sUSUARIO ACEPTADO: %s%s\n", KGRN,user,KNRM);
 		enviar_a_cliente("1");
 		auth_flag=1;
 	}
 	else{											//si auth sale bloqueado, notifica al server
 		char* nombre = strtok(buffer, "-");
-		printf("USUARIO BLOQUEADO: %s\n", nombre);
+		printf("%sUSUARIO BLOQUEADO: %s%s\n", KRED,nombre,KNRM);
 		enviar_a_cliente("2");
 		auth_flag=0;
 	}
@@ -262,7 +278,7 @@ void validar_comando(char *a, char *b, char *c){
 	y cambia la bandera salida para que salga del bucle en el main
 */
 void exit_command() {
-	printf("El usuario %s se ha desconectado\n", user );
+	printf("%sEl usuario %s se ha desconectado%s\n", KBLU,user,KNRM );
 	exit_flag = 1;
 }
 

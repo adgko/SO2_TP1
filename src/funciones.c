@@ -7,14 +7,14 @@
 int32_t get_queue() {
 
   key_t qkey;
-  qkey = ftok(QUEUE_NAME, PROJ_ID);		//devuelve una key desde el path y los 8 bits menos significativos de PROJ_ID
+  qkey = ftok(QUEUE_NAME, UNIQUE_KEY);		//devuelve una key desde el path y los 8 bits menos significativos de PROJ_ID
 
   if (qkey == -1) {
     perror("error obteniendo token");
     exit(1);
   }
 
-  return msgget(qkey, IPC_CREAT);				//devuelve el id de la cola asociada a qkey. IPC_CREATE sirve para que falle si la cola ya existe
+  return msgget(qkey, PROJ_ID|IPC_CREAT);				//devuelve el id de la cola asociada a qkey. IPC_CREATE sirve para que falle si la cola ya existe
 }
 
 /*

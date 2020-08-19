@@ -14,7 +14,7 @@ struct hostent *server_file;
 int terminar = 0;
 char buffer[TAM];
 int auth_flag = 0;
-int32_t rta;
+int32_t rta = 0;
 
 int main(int argc, char *argv[])
 {
@@ -46,13 +46,13 @@ int main(int argc, char *argv[])
 				rta = login();
 
 				if(rta == 0)
-					printf("credenciales erroneas, vuelva a intentar\n");
+					printf("%scredenciales erroneas, vuelva a intentar%s\n",KYEL,KNRM);
 				else if(rta == 1) {
-					printf("Conectado\n");
+					printf("%sConectado%s\n",KGRN,KNRM);
 					auth_flag = 1;
 				}
 				else if(rta == 2) {
-					printf("\nUsuario bloqueado\n\n");
+					printf("\n%sUsuario bloqueado%s\n\n",KRED,KNRM);
 					salida(0);
 				}
 
@@ -65,15 +65,15 @@ int main(int argc, char *argv[])
 				comandos();
 				if(buffer[0] != '\0'){		//por si el mensaje es nulo
 
-					if(strcmp(buffer, "exit \n") == 0){	//si se escribe "exit", cierra sesión y cierra el programa
+					if(strcmp(buffer, "exit\n") == 0){	//si se escribe "exit", cierra sesión y cierra el programa
 						salida(1);
 					}
 
 					recibir_respuesta(sockfd);	
 
 					if(strcmp(buffer, "descarga_no") == 0){
-						printf("No se encuentra el archivo\n");
-						printf("Asegurese de que este bien escrito\n");
+						printf("%sNo se encuentra el archivo%s\n",KYEL,KNRM);
+						printf("%sAsegurese de que este bien escrito%s\n",KYEL,KNRM);
 					}
 					else if(strcmp(buffer, "descarga_si") == 0) {
 						descargar();
@@ -121,7 +121,7 @@ void signal_handler()
 }
 void salida(int32_t exit_flag) {
 	if(exit_flag == 1){								// como y aestaba logueado, avisa al server que se va
-		printf("Vuelvas prontoss \n");
+		printf("%sVuelvas prontoss%s \n",KBLU,KNRM);
 		fflush(stdout);
 		enviar_a_socket(sockfd, "exit\n");
 		}		
@@ -174,8 +174,10 @@ int32_t login(){
 		return 1;
 	else if( buffer[0] == '0' )
 		return 0;
-	else
+	else{
+		printf("%s\n",buffer );
 		return 2;
+	}
 }
 
 void comandos(){

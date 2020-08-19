@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h> 
@@ -43,8 +42,8 @@
 #define FILES_RESPONSE 8
 #define DOWNLOAD_REQUEST 9
 #define DOWNLOAD_RESPONSE 10
-#define AUTH_PATH "bin/auth"
-#define FILE_PATH "bin/file"
+#define AUTH_PATH "auth"
+#define FILE_PATH "file"
 
 #define PUERTO_FILE 1051
 
@@ -62,8 +61,9 @@
 #define KCYN  "\x1B[36m"	//cyan
 #define KWHT  "\x1B[37m"	//blanco
 
-#define QUEUE_NAME "src/servidor.c"
-#define PROJ_ID 112
+#define QUEUE_NAME "../archivos/queue"
+#define UNIQUE_KEY 65
+#define PROJ_ID 0666
 #define direccion_server "src/servidor.c"
 
 
