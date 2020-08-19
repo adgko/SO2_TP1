@@ -151,13 +151,12 @@ int32_t login(){
     printf("Ingrese su contraseña:\n");
     fgets(password,TAM,stdin);
 
-    char* cad_aux = malloc(strlen(usuario) + strlen(password) + strlen(" "));
+    char* cad_aux = malloc(strlen(usuario) + strlen(password));
     if(cad_aux == NULL) {
 		perror("error de alocación\n");
 		exit(1);
 	}
-	sprintf(cad_aux, "%s%s%s", usuario, " ", password);			// almacena todos los valores en cad_aux
-
+	sprintf(cad_aux, "%s%s", usuario, password);			// almacena todos los valores en cad_aux
 	/*
 		envío el usuario y contraseña al server y libero la memoria 
 		para que no se solape si tengo que ingresar los datos de nuevo

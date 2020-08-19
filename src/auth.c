@@ -98,10 +98,9 @@ void listen_user(){
 	guarda las credenciales y las usa para logearse 
 */
 void login_request(){
-	printf("%sLOGIN_REQUEST %s%s\n", KCYN,mensaje,KNRM);
+	
 
 		char credenciales[strlen(mensaje)];
-		char p[TAM];
 		if(credenciales == NULL){
 			printf("%sError alocando memoria%s\n",KRED,KNRM);
 			exit(1);
@@ -111,17 +110,22 @@ void login_request(){
 
 		int32_t log = login(credenciales);
 
-		printf("Soco1\n" );
+		//char rta = verificar_log(log);
+		int32_t rta = verificar_log(log);
+		printf("%d\n", rta );
 
-		char rta = verificar_log(&log);
+		char* aux = " ";
+		sprintf(aux,"%d",rta);
+		printf("%s\n",aux );
 
-		printf("Soco2\n" );
+		printf("algo3\n");
+		send_to_queue((long)LOGIN_RESPONSE,aux);
 
-		send_to_queue((long)LOGIN_RESPONSE,&rta);
+
 
 		//printf("LOGIN_RESPONSE: %c\n", rta);
-		sprintf(p,"LOGIN_RESPONSE: %s\n",&rta);
-		printf("%s%s%s",KCYN,p,KNRM);
+		//sprintf(p,"LOGIN_RESPONSE: %s\n",&rta);
+		//printf("%s%s%s",KCYN,p,KNRM);
 }
 
 /*
@@ -129,16 +133,18 @@ void login_request(){
 */
 int32_t login(char* credenciales){
 	
+	printf("%s\n", credenciales);
 	char* login;
 
-	login = strtok(credenciales, " ");
+	login = strtok(credenciales, "\n");
 	char usuario[strlen(login)];
 	sprintf(usuario, "%s", login);
 
-	login = strtok(NULL, " ");
+	login = strtok(NULL, "\n");
 	char password[strlen(login)];
 	sprintf(password,"%s",login);
 
+	printf("%s %s\n",usuario,password );
 	for(int32_t i = 0; i < CANTIDAD_USUARIOS; i++) {
 		if( strcmp(usuario, usuarios[i]->usuario) == 0 ) {
 			if( strcmp(password, usuarios[i]->password) == 0 ) {
@@ -164,18 +170,21 @@ int32_t login(char* credenciales){
 	Valida la respuesta de login. 0 es datos incorrectos,
 	1 es usuario logueado y 2 es usuario bloqueado
 */
-char verificar_log(int32_t* log){
-	char* aux = " ";
-	if(*log == 0){
-		sprintf(aux,"0");
+int32_t verificar_log(int32_t log){
+	int32_t aux = 0;
+	if(log == 0){
+		//sprintf(aux,"%d",'0');
+		aux = 0;
 	}
-	else if(*log == 1){
-		sprintf(aux,"1");
+	else if(log == 1){
+		//sprintf(aux,"%d",'1');
+		aux = 1;
 	}
 	else{
-		sprintf(aux,"2");
+		//sprintf(aux,"%d",'2');
+		aux = 2;
 	}
-	return *aux;
+	return aux;
 }
 
 /*

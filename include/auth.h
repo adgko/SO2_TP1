@@ -6,7 +6,7 @@ void leer_bd();
 void listen_user();
 int32_t login(char*);
 void login_request();
-char verificar_log(int32_t*);
+int32_t verificar_log(int32_t);
 void names_request();
 void password_change();
 void change_password(char*);

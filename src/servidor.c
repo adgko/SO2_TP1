@@ -167,15 +167,6 @@ void rec_user(){
 		}
 }
 
-/*
-	Envía mesnaje a la cola de mensaje
-*/
-void enviar_a_cola_local(long id, char mensaje[MENSAJE_TAM]) {
-	if(send_to_queue(id, mensaje) == -1) {
-		printf("%serror enviando mensaje%s\n", KRED, KNRM );
-		exit(1);
-	}
-}
 
 /*
 	Envía datos hacia el cliente. Usado para respuestas de login y comandos
@@ -193,7 +184,7 @@ void enviar_a_cliente(char* mensaje) {
 	1 (usuario logueado) o 2 (usuario bloqueado)
 */
 void verificar_respuesta(){
-	if( mensaje_resp[0] == '0') {					//si auth dice "0", es que el usuario está bloqueado
+	if( mensaje_resp[0] == '0') {					//si auth dice "0", es que el usuario o la contraseña está mal escrito
 		char* nombre = strtok(buffer, "-");
 		printf("%sINTENTO FALLIDO: %s%s\n", KYEL,nombre,KNRM);
 		printf("%sRevise que este bien escrito%s\n",KYEL,KNRM);
