@@ -5,6 +5,9 @@
 void leer_bd();
 void listen_user();
 int32_t login(char*);
+int32_t get_bloqueado();
+void set_ultima_conexion();
+int32_t set_intentos(int32_t);
 void login_request();
 int32_t verificar_log(int32_t);
 void names_request();

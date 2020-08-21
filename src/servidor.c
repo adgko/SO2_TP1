@@ -287,7 +287,6 @@ void user_command( char *opcion, char *argumento) {
 		user_ls();
 	}
 	else if( strcmp("passwd", opcion) == 0 && strcmp(" ", argumento) != 0){
-		printf("viendo si anda el user_passwd\n");
 		user_passwd(argumento);
 	}
 	else {
@@ -332,7 +331,6 @@ void user_passwd(char* clave) {
 	send_to_queue((long) PASSWORD_CHANGE, cad_aux);
 	//free(cad_aux);
 	recive_from_queue((long) PASSWORD_CHANGE_RESPONSE, 0);
-	printf("viendo si anda user_passwd\n");
 	enviar_a_cliente("Clave cambiada con exito");
 
 	return;

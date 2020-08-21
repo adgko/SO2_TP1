@@ -2,7 +2,8 @@
 
 Usuario* usuarios[CANTIDAD_USUARIOS];
 char* mensaje;
-char* user;
+char user[USUARIO_TAM];
+char user_aux[USUARIO_TAM];
 
 int32_t main(){
 
@@ -87,7 +88,6 @@ void listen_user(){
 	// el server solicita un cambio de contraseña
 	mensaje = recive_from_queue((long)PASSWORD_CHANGE,MSG_NOERROR | IPC_NOWAIT);
 	if(errno != ENOMSG){
-		printf("viendo si anda6\n");
 		password_change();
 	}
 }
@@ -106,6 +106,8 @@ void login_request(){
 		sprintf(credenciales,"%s",mensaje);
 
 		int32_t log = login(credenciales);
+
+		printf("%s\n",user );
 
 		int32_t rta = verificar_log(log);
 
@@ -133,28 +135,22 @@ int32_t login(char* credenciales){
 	char password[strlen(login)];
 	sprintf(password,"%s",login);
 
-	printf("Verificando que onda el log\n");
 	for(int32_t i = 0; i < CANTIDAD_USUARIOS; i++) {
 		if( strcmp(usuario, usuarios[i]->usuario) == 0 ) {
-			printf("%s%s\n", usuarios[i]->usuario," es este");
-			int32_t aux1 = atoi(usuarios[i]->intentos);
-			if( aux1 < 3) {
+			sprintf(user_aux,"%s",usuario);
+			if(get_bloqueado()){
 				if( strcmp(password, usuarios[i]->password) == 0 ) {
-					//set_ultima_conexion(usuarios[i]->usuario);
-					printf("entro aca?\n");
+					set_ultima_conexion();
 					sprintf(usuarios[i]->intentos,"%s", "0");		//al loguear, setea los intentos en 0
 					sprintf(user,"%s",usuarios[i]->usuario);
 					actualizar_bd();
-					printf("va salir?\n");
 					return 1;
 				}
 				else{
-					int32_t aux2 = 0;
-					printf("fallo el password\n");
-					aux2 = atoi(usuarios[i]->intentos);
-					aux2++;
-					printf("intentos: %d\n", aux2);
-					sprintf(usuarios[i]->intentos,"%d", aux2);   //como es incorrecto, aumenta los intentos en 1
+					int32_t aux = set_intentos(i);
+					sprintf(usuarios[i]->intentos,"%d", aux);
+					printf("%sfallo el password%s\n",KYEL,KNRM);
+					printf("%sintentos: %s%s\n", KYEL,usuarios[i]->intentos,KNRM);
 					actualizar_bd();
 					return 0;
 				}
@@ -167,6 +163,65 @@ int32_t login(char* credenciales){
 	return 0;
 }
 
+/*
+	Valida si está bloqueado
+	Devuelve 1 si tiene intentos disponibles
+	Devuelve 0 si no los tiene
+*/
+int32_t get_bloqueado(){
+	for(int32_t i=0; i<CANTIDAD_USUARIOS; i++){
+		if(strcmp(user_aux,usuarios[i]->usuario) == 0){
+			int32_t intentos = atoi(usuarios[i]->intentos);
+			if(intentos < 3)
+				return 1;
+			else
+				return 0;
+		}
+	}
+	return 0;
+}
+
+/*
+	Calcula el tiempo actual y lo guarda en su campo correspondiente
+*/
+void set_ultima_conexion(){
+	time_t rawtime = time(NULL);
+    if (rawtime == -1) {
+        perror("tiempo fallido");
+        return;
+    }
+
+    struct tm *ptm = localtime(&rawtime);
+    if (ptm == NULL) {
+        perror("tiempo local fallido");
+        return;
+    }
+
+    char aux[LAST_CONECTION_SIZE];
+    sprintf(aux,"%d-%02d-%02d %02d:%02d:%02d",ptm->tm_year + 1900,
+	 ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, 
+           ptm->tm_min, ptm->tm_sec);
+
+    printf("%s\n",aux );
+
+    for(int32_t i=0; i<CANTIDAD_USUARIOS; i++){
+		if(strcmp(user_aux,usuarios[i]->usuario) == 0){
+			sprintf(usuarios[i]->ultima_conexion,"%s",aux);
+		}
+	}
+	return;
+}
+
+/*
+	Recupera cuantos intentos tiene el usuario
+	y lo aumenta en 1
+*/
+int32_t set_intentos(int32_t i){
+	int32_t aux = 0;
+	aux = atoi(usuarios[i]->intentos);
+	aux++;
+	return aux;
+}
 /*
 	Valida la respuesta de login. 0 es datos incorrectos,
 	1 es usuario logueado y 2 es usuario bloqueado
@@ -232,8 +287,6 @@ void names_request(){
 */
 void password_change(){
 
-	printf("%s3%s",KMAG,KNRM);
-
 	char credenciales[strlen(mensaje)];
 	if(credenciales == NULL){
 		printf("%sError alocando memoria%s\n",KRED,KNRM);
@@ -248,13 +301,14 @@ void password_change(){
 	send_to_queue((long)PASSWORD_CHANGE_RESPONSE,"PASSWORD_CHANGE_RESPONSE");
 }
 
-
+/*
+	Levanta la contraseña que envía el server para cambiar
+	busca el usuario que matchea con el que está logueado
+	y le guarda la nueva contraseña en el campo correspondiente
+*/
 void change_password(char* datos){
 
 	char* aux = strtok(datos,"\n");
-	//char usuario[strlen(aux)];
-	//sprintf(usuario,"%s",aux);
-	//aux = strtok(NULL,"\0");
 	char new_password[strlen(aux)];
 	sprintf(new_password,"%s",aux);
 	
