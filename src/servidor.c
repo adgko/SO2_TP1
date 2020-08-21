@@ -15,7 +15,7 @@ struct hostent *server;
 struct hostent *server_file;
 int terminar;
 char buffer[TAM], direccion[20];
-int auth_flag, exit_flag;					//bandera autenticación y salida
+int auth_flag, exit_flag, on_flag;					//bandera autenticación, salida y funcionamiento
 int32_t rta;								//respuesta del server al cliente
 uint32_t client_len;						//tamaño de la dirección del cliente
 char* mensaje_resp;
@@ -60,15 +60,15 @@ int32_t main( int32_t argc, char *argv[] ){
    			exit(0);
 		}
 	
+	conectar_cliente();
+	exit_flag = 0;
+	auth_flag = 0;
+	on_flag = 1;
 
-	while( 1 ) {
-		conectar_cliente();
-
-		exit_flag = 0;
-		auth_flag = 0;
+	while(on_flag) {
 
 		if(auth_flag == 0){
-			printf("%sautenticando%s\n",KGRN,KNRM);
+			printf("%sAUTENTICANDO%s\n",KGRN,KNRM);
 
 			rec_user();				//recibo credenciales de usuario
 
@@ -90,6 +90,7 @@ int32_t main( int32_t argc, char *argv[] ){
 			}
 
 		}
+
 	}
 				
 		
@@ -185,20 +186,20 @@ void enviar_a_cliente(char* mensaje) {
 */
 void verificar_respuesta(){
 	if( mensaje_resp[0] == '0') {					//si auth dice "0", es que el usuario o la contraseña está mal escrito
-		char* nombre = strtok(buffer, "-");
+		char* nombre = strtok(buffer, "\n");
 		printf("%sINTENTO FALLIDO: %s%s\n", KYEL,nombre,KNRM);
 		printf("%sRevise que este bien escrito%s\n",KYEL,KNRM);
 		enviar_a_cliente("0");
 		auth_flag=0;
 	}
 	else if(mensaje_resp[0] == '1') {				//si se loguea, guarda el user para comandos
-		sprintf(user, "%s", strtok(buffer, "-"));
+		sprintf(user, "%s", strtok(buffer, "\n"));
 		printf("%sUSUARIO ACEPTADO: %s%s\n", KGRN,user,KNRM);
 		enviar_a_cliente("1");
 		auth_flag=1;
 	}
 	else{											//si auth sale bloqueado, notifica al server
-		char* nombre = strtok(buffer, "-");
+		char* nombre = strtok(buffer, "\n");
 		printf("%sUSUARIO BLOQUEADO: %s%s\n", KRED,nombre,KNRM);
 		enviar_a_cliente("2");
 		auth_flag=0;
@@ -206,10 +207,10 @@ void verificar_respuesta(){
 }
 
 /*
-	Obtiene e comando a enviar y funciona como intermediario
+	Obtiene el comando a enviar y funciona como intermediario
 */
 void middle(){
-	buffer[strlen(buffer)-1]='\0'; //coloca un salto de linea al final del comando
+	buffer[strlen(buffer)-1]='\0'; //coloca un valor final al final del comando
 
 	/*
 	variables que usa para guardar comandos, opciones y argumentos
@@ -235,6 +236,8 @@ void middle(){
 
 		mensaje_comando = strtok(NULL," ");
 	}
+
+	fflush(stdout);
 
 	printf("%s - %s %s %s\n", user, comando, opcion, argumento );
 
@@ -271,6 +274,7 @@ void validar_comando(char *a, char *b, char *c){
 void exit_command() {
 	printf("%sEl usuario %s se ha desconectado%s\n", KBLU,user,KNRM );
 	exit_flag = 1;
+	on_flag = 0;
 }
 
 /*
@@ -283,6 +287,7 @@ void user_command( char *opcion, char *argumento) {
 		user_ls();
 	}
 	else if( strcmp("passwd", opcion) == 0 && strcmp(" ", argumento) != 0){
+		printf("viendo si anda el user_passwd\n");
 		user_passwd(argumento);
 	}
 	else {
@@ -309,7 +314,6 @@ void user_ls() {
 	}
 	sprintf(respuesta_envio, "%s", mensaje_resp);
 	enviar_a_cliente(respuesta_envio);
-
 }
 
 /*
@@ -322,13 +326,16 @@ void user_passwd(char* clave) {
 		return;
 	}
 
-	char* cad_aux = malloc(strlen(user) + strlen(clave) + strlen(" "));
-	sprintf(cad_aux,"%s%s%s", user, " ", clave);
+	char* cad_aux = malloc(strlen(clave));
+	sprintf(cad_aux,"%s", clave);
 
-	send_to_queue((long) PASSWORD_CHANGE, "CAMBIAR CLAVE");
+	send_to_queue((long) PASSWORD_CHANGE, cad_aux);
+	//free(cad_aux);
 	recive_from_queue((long) PASSWORD_CHANGE_RESPONSE, 0);
-
+	printf("viendo si anda user_passwd\n");
 	enviar_a_cliente("Clave cambiada con exito");
+
+	return;
 }
 
 /*

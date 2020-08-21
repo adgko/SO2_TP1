@@ -44,6 +44,9 @@
 #define DOWNLOAD_RESPONSE 10
 #define AUTH_PATH "auth"
 #define FILE_PATH "file"
+#define USUARIO_ERROR 0
+#define USUARIO_ACEPTADO 1
+#define USUARIO_BLOQUEADO 2
 
 #define PUERTO_FILE 1051
 

@@ -203,7 +203,7 @@ void download_request(){
 	int32_t flag = 0;
 	int32_t indice_archivo = 0;
 	//busca que archivo matchea el nombre con el buscado
-	for(int32_t i; i < CANT_ARCHIVOS; i++){
+	for(int32_t i=0; i < CANT_ARCHIVOS; i++){
 		if(strcmp(archivos[i]->nombre,mensaje_resp)==0){
 			flag = 1;
 			indice_archivo = i;

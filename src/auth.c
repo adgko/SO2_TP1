@@ -2,9 +2,11 @@
 
 Usuario* usuarios[CANTIDAD_USUARIOS];
 char* mensaje;
+char* user;
 
 int32_t main(){
 
+	printf("%sIniciando Auth Service%s\n", KBLU,KNRM );
 	leer_bd();
 
 	while(1){		//se queda esperando que en la cola haya algo para él
@@ -52,16 +54,12 @@ void leer_bd() {
 		}
 
 		sprintf(usuarios[usuario_index]->usuario, "%s", lineas[k++]);
-		printf("%s\n", usuarios[usuario_index]->usuario);
 		usuarios[usuario_index]->usuario[strlen(usuarios[usuario_index]->usuario) - 1] = '\0';
 		sprintf(usuarios[usuario_index]->password, "%s", lineas[k++]);
-		printf("%s\n", usuarios[usuario_index]->password);
 		usuarios[usuario_index]->password[strlen(usuarios[usuario_index]->password) - 1] = '\0';
 		sprintf(usuarios[usuario_index]->intentos, "%s", lineas[k++]);
-		printf("%s\n", usuarios[usuario_index]->intentos);
 		usuarios[usuario_index]->intentos[strlen(usuarios[usuario_index]->intentos) - 1] = '\0';
 		sprintf(usuarios[usuario_index]->ultima_conexion, "%s", lineas[k++]);
-		printf("%s\n", usuarios[usuario_index]->ultima_conexion);
 		usuarios[usuario_index]->ultima_conexion[strlen(usuarios[usuario_index]->ultima_conexion) - 1] = '\0';
 	}
 	//printf("%sHola\n",KRED );
@@ -73,7 +71,6 @@ void leer_bd() {
 	preguntando por el siguiente tipo de mensaje
 */
 void listen_user(){
-
 	// el server solicita que loguee un user
 	mensaje = recive_from_queue((long)LOGIN_REQUEST,MSG_NOERROR | IPC_NOWAIT);
 	if(errno != ENOMSG){
@@ -90,6 +87,7 @@ void listen_user(){
 	// el server solicita un cambio de contraseña
 	mensaje = recive_from_queue((long)PASSWORD_CHANGE,MSG_NOERROR | IPC_NOWAIT);
 	if(errno != ENOMSG){
+		printf("viendo si anda6\n");
 		password_change();
 	}
 }
@@ -106,26 +104,16 @@ void login_request(){
 			exit(1);
 		}
 		sprintf(credenciales,"%s",mensaje);
-		printf("%s\n",credenciales );
 
 		int32_t log = login(credenciales);
 
-		//char rta = verificar_log(log);
 		int32_t rta = verificar_log(log);
-		printf("%d\n", rta );
 
-		char* aux = " ";
+		char aux[3] = "";
 		sprintf(aux,"%d",rta);
-		printf("%s\n",aux );
+		printf("%srevisando login_request%s\n",KCYN,KNRM);
 
-		printf("algo3\n");
 		send_to_queue((long)LOGIN_RESPONSE,aux);
-
-
-
-		//printf("LOGIN_RESPONSE: %c\n", rta);
-		//sprintf(p,"LOGIN_RESPONSE: %s\n",&rta);
-		//printf("%s%s%s",KCYN,p,KNRM);
 }
 
 /*
@@ -133,33 +121,46 @@ void login_request(){
 */
 int32_t login(char* credenciales){
 	
-	printf("%s\n", credenciales);
 	char* login;
 
 	login = strtok(credenciales, "\n");
 	char usuario[strlen(login)];
 	sprintf(usuario, "%s", login);
 
+	printf("%sLOGIN REQUEST %s%s\n",KCYN,usuario,KNRM );
+
 	login = strtok(NULL, "\n");
 	char password[strlen(login)];
 	sprintf(password,"%s",login);
 
-	printf("%s %s\n",usuario,password );
+	printf("Verificando que onda el log\n");
 	for(int32_t i = 0; i < CANTIDAD_USUARIOS; i++) {
 		if( strcmp(usuario, usuarios[i]->usuario) == 0 ) {
-			if( strcmp(password, usuarios[i]->password) == 0 ) {
-				if( atoi(usuarios[i]->intentos) < 3) {
+			printf("%s%s\n", usuarios[i]->usuario," es este");
+			int32_t aux1 = atoi(usuarios[i]->intentos);
+			if( aux1 < 3) {
+				if( strcmp(password, usuarios[i]->password) == 0 ) {
 					//set_ultima_conexion(usuarios[i]->usuario);
-					sprintf(usuarios[i]->intentos,"%d", 0);		//al loguear, setea los intentos en 0
+					printf("entro aca?\n");
+					sprintf(usuarios[i]->intentos,"%s", "0");		//al loguear, setea los intentos en 0
+					sprintf(user,"%s",usuarios[i]->usuario);
+					actualizar_bd();
+					printf("va salir?\n");
 					return 1;
 				}
 				else{
-					
-					return 2;   // usuario bloqueado
+					int32_t aux2 = 0;
+					printf("fallo el password\n");
+					aux2 = atoi(usuarios[i]->intentos);
+					aux2++;
+					printf("intentos: %d\n", aux2);
+					sprintf(usuarios[i]->intentos,"%d", aux2);   //como es incorrecto, aumenta los intentos en 1
+					actualizar_bd();
+					return 0;
 				}
 			}
 			else{
-				sprintf(usuarios[i]->intentos,"%s", usuarios[i]->intentos+1);   //como es incorrecto, aumenta los intentos en 1
+				return 2;   // usuario bloqueado
 			}
 		}
 	}
@@ -171,20 +172,15 @@ int32_t login(char* credenciales){
 	1 es usuario logueado y 2 es usuario bloqueado
 */
 int32_t verificar_log(int32_t log){
-	int32_t aux = 0;
 	if(log == 0){
-		//sprintf(aux,"%d",'0');
-		aux = 0;
+		return 0;
 	}
 	else if(log == 1){
-		//sprintf(aux,"%d",'1');
-		aux = 1;
+		return 1;
 	}
 	else{
-		//sprintf(aux,"%d",'2');
-		aux = 2;
+		return 2;
 	}
-	return aux;
 }
 
 /*
@@ -192,8 +188,6 @@ int32_t verificar_log(int32_t log){
 	ultima conexión
 */
 void names_request(){
-	
-	printf("%s2%s",KMAG,KNRM);
 
 	char* encabezado = "[Usuario] - [Bloqueado] - [Ultima conexion]\n";
 	size_t size = strlen(encabezado);
@@ -257,15 +251,15 @@ void password_change(){
 
 void change_password(char* datos){
 
-	char* aux = strtok(datos,"-");
-	char usuario[strlen(aux)];
-	sprintf(usuario,"%s",aux);
-	aux = strtok(NULL,"\0");
+	char* aux = strtok(datos,"\n");
+	//char usuario[strlen(aux)];
+	//sprintf(usuario,"%s",aux);
+	//aux = strtok(NULL,"\0");
 	char new_password[strlen(aux)];
 	sprintf(new_password,"%s",aux);
 	
 	for(int32_t i=0; i<CANTIDAD_USUARIOS; i++){
-		if(strcmp(usuario,usuarios[i]->usuario) == 0){
+		if(strcmp(user,usuarios[i]->usuario) == 0){
 			sprintf(usuarios[i]->password,"%s",new_password);
 		}
 	}
@@ -280,18 +274,18 @@ void actualizar_bd(){
 	FILE *file;
 	file = fopen(base_datos_usuarios, "w+"); //para leer y escribir
 
-	if(file != NULL){
+	//se empleó fputs y no resultó ser útil
 		for(int32_t i=0; i<CANTIDAD_USUARIOS; i++){
-			fputs(usuarios[i]->usuario, file);
-			fputs("\n",file);
-			fputs(usuarios[i]->password, file);
-			fputs("\n",file);
-			fputs(usuarios[i]->intentos, file);
-			fputs("\n",file);
-			fputs(usuarios[i]->ultima_conexion, file);
-			fputs("\n",file);
+			fprintf(file,"%s",usuarios[i]->usuario);
+			fprintf(file,"%s","\n");
+			fprintf(file,"%s",usuarios[i]->password);
+			fprintf(file,"%s","\n");
+			fprintf(file,"%s",usuarios[i]->intentos);
+			fprintf(file,"%s","\n");
+			fprintf(file,"%s",usuarios[i]->ultima_conexion);
+			fprintf(file,"%s","\n");
 		}
 		fclose(file);
-	}
+	
 
 }

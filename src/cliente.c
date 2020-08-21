@@ -13,8 +13,9 @@ struct hostent *server;
 struct hostent *server_file;
 int terminar = 0;
 char buffer[TAM];
-int auth_flag = 0;
+int32_t auth_flag = 0;
 int32_t rta = 0;
+int32_t command_flag = 0;
 
 int main(int argc, char *argv[])
 {
@@ -48,11 +49,11 @@ int main(int argc, char *argv[])
 				if(rta == 0)
 					printf("%scredenciales erroneas, vuelva a intentar%s\n",KYEL,KNRM);
 				else if(rta == 1) {
-					printf("%sConectado%s\n",KGRN,KNRM);
+					printf("%sCONECTADO%s\n",KGRN,KNRM);
 					auth_flag = 1;
 				}
 				else if(rta == 2) {
-					printf("\n%sUsuario bloqueado%s\n\n",KRED,KNRM);
+					printf("\n%sUSUARIO BLOQUEADO%s\n\n",KRED,KNRM);
 					salida(0);
 				}
 
@@ -64,13 +65,8 @@ int main(int argc, char *argv[])
 			else{
 				comandos();
 				if(buffer[0] != '\0'){		//por si el mensaje es nulo
-
-					if(strcmp(buffer, "exit\n") == 0){	//si se escribe "exit", cierra sesión y cierra el programa
-						salida(1);
-					}
-
-					recibir_respuesta(sockfd);	
-
+					printf("recibiendo respuesta\n");
+					recibir_respuesta(sockfd);
 					if(strcmp(buffer, "descarga_no") == 0){
 						printf("%sNo se encuentra el archivo%s\n",KYEL,KNRM);
 						printf("%sAsegurese de que este bien escrito%s\n",KYEL,KNRM);
@@ -146,9 +142,9 @@ int32_t login(){
 	char usuario[TAM];
 	char password[TAM];
 
-	printf("Ingrese su usuario:\n");
+	printf("%sIngrese su usuario:%s\n",KMAG,KNRM);
     fgets(usuario,TAM,stdin);
-    printf("Ingrese su contraseña:\n");
+    printf("%sIngrese su contraseña:%s\n",KMAG,KNRM);
     fgets(password,TAM,stdin);
 
     char* cad_aux = malloc(strlen(usuario) + strlen(password));
@@ -163,18 +159,19 @@ int32_t login(){
 	*/
 	enviar_a_socket(sockfd,cad_aux);	
 	free(cad_aux);
-
+	recibir_respuesta(sockfd);
 	/*
 		si el server escribe un 1 en el buffer, se logueo correctamente. 
 		Si escribe un 0, falló y pide nuevamente las credenciales
 		Si escribe cualquier otra cosa, el usuario está bloqueado.
 	*/
-	if( buffer[0] == '1' )						
+	if( strcmp(buffer,"1") == 0 ){						
 		return 1;
-	else if( buffer[0] == '0' )
+	}
+	else if( strcmp(buffer,"0") == 0 ){
 		return 0;
+	}
 	else{
-		printf("%s\n",buffer );
 		return 2;
 	}
 }
@@ -185,6 +182,10 @@ void comandos(){
 		printf("$");
 		fgets(buffer,TAM,stdin); 			// pido comando
 		if(buffer[0] != '\n'){				//si en el buffer no hay una nueva linea, envía
+			if(strcmp(buffer, "exit\n") == 0){	//si se escribe "exit", cierra sesión y cierra el programa
+				salida(1);
+			}
+
 			enviar_comando();
 		}else{
 			break;
