@@ -8,11 +8,11 @@ char user_aux[USUARIO_TAM];
 int32_t main(){
 
 	printf("%sIniciando Auth Service%s\n", KBLU,KNRM );
+
 	leer_bd();
 
 	while(1){		//se queda esperando que en la cola haya algo para él
 		listen_user();
-		sleep(TIME_SLEEP);
 	}
 	exit(0);
 }
@@ -23,7 +23,9 @@ int32_t main(){
 */
 void leer_bd() {
 
+
 	char lineas[CANTIDAD_USUARIOS * USUARIO_CAMPOS][RENGLON];
+	int32_t renglones = 0;
 	
 	FILE *file;
 	file = fopen(base_datos_usuarios, "r"); // para leer
@@ -34,36 +36,53 @@ void leer_bd() {
       	while ( fgets( line, RENGLON, file ) != NULL ) {
 				sprintf(lineas[index], "%s", line);
 				index++;
+				renglones++;
       	}
 
-      	fclose(file);
+      	
  	}
 	else{
 		printf("%sError al Leer la Base de Datos%s\n", KRED,KNRM);
 		exit(1);
 	}
+	fclose(file);
 	/*
 		Por cada usuario y por cada campo de todo el grupo, se guarda 
 		los datos obtenidos del documento
 	*/
-	for(int32_t i = 0,k = 0; i < CANTIDAD_USUARIOS && k < CANTIDAD_USUARIOS*USUARIO_CAMPOS;i++) {
-		int32_t usuario_index = i;
-		usuarios[usuario_index] = malloc(sizeof(Usuario));
-		if(usuarios[usuario_index] == NULL) {
+	for(int32_t i = 0,k = 0; i < CANTIDAD_USUARIOS && k < renglones;i++) {
+		usuarios[i] = malloc(sizeof(Usuario));
+		if(usuarios[i] == NULL) {
 			printf("%sError alocando memoria en usuarios%s\n",KRED,KNRM);
 			exit(1);
 		}
-
-		sprintf(usuarios[usuario_index]->usuario, "%s", lineas[k++]);
-		usuarios[usuario_index]->usuario[strlen(usuarios[usuario_index]->usuario) - 1] = '\0';
-		sprintf(usuarios[usuario_index]->password, "%s", lineas[k++]);
-		usuarios[usuario_index]->password[strlen(usuarios[usuario_index]->password) - 1] = '\0';
-		sprintf(usuarios[usuario_index]->intentos, "%s", lineas[k++]);
-		usuarios[usuario_index]->intentos[strlen(usuarios[usuario_index]->intentos) - 1] = '\0';
-		sprintf(usuarios[usuario_index]->ultima_conexion, "%s", lineas[k++]);
-		usuarios[usuario_index]->ultima_conexion[strlen(usuarios[usuario_index]->ultima_conexion) - 1] = '\0';
+		sprintf(usuarios[i]->usuario, "%s", lineas[k++]);
+		usuarios[i]->usuario[strlen(usuarios[i]->usuario) - 1] = '\0';
+		printf("%s\n", usuarios[i]->usuario);
+		sprintf(usuarios[i]->password, "%s", lineas[k++]);
+		usuarios[i]->password[strlen(usuarios[i]->password) - 1] = '\0';
+		printf("%s\n", usuarios[i]->password);
+		sprintf(usuarios[i]->intentos, "%s", lineas[k++]);
+		usuarios[i]->intentos[strlen(usuarios[i]->intentos) - 1] = '\0';
+		printf("%s\n", usuarios[i]->intentos);
+		sprintf(usuarios[i]->ultima_conexion, "%s", lineas[k++]);
+		usuarios[i]->ultima_conexion[strlen(usuarios[i]->ultima_conexion) - 1] = '\0';
+		printf("%s\n", usuarios[i]->ultima_conexion);
+		
 	}
-	//printf("%sHola\n",KRED );
+}
+
+/*
+	recorre el arreglo archivo, limpiando la memoria de sus campos
+	para que no quede nada de corridas anteriores
+*/
+void vaciar_archivos(){
+	for(int32_t i=0;i<CANTIDAD_USUARIOS;i++){
+		memset(usuarios[i]->usuario,0,sizeof(usuarios[i]->usuario));
+		memset(usuarios[i]->password,0,sizeof(usuarios[i]->password));
+		memset(usuarios[i]->intentos,0,sizeof(usuarios[i]->intentos));
+		memset(usuarios[i]->ultima_conexion,0,sizeof(usuarios[i]->ultima_conexion));
+	}
 }
 
 /*
@@ -90,6 +109,9 @@ void listen_user(){
 	if(errno != ENOMSG){
 		password_change();
 	}
+
+	//actualiza el archivo antes de preguntar de nuevo
+	//actualizar_bd();
 }
 
 /*
@@ -97,13 +119,14 @@ void listen_user(){
 */
 void login_request(){
 	
-
 		char credenciales[strlen(mensaje)];
 		if(credenciales == NULL){
 			printf("%sError alocando memoria%s\n",KRED,KNRM);
 			exit(1);
 		}
 		sprintf(credenciales,"%s",mensaje);
+
+		printf("%srevisando login_request%s\n",KCYN,KNRM);
 
 		int32_t log = login(credenciales);
 
@@ -113,9 +136,10 @@ void login_request(){
 
 		char aux[3] = "";
 		sprintf(aux,"%d",rta);
-		printf("%srevisando login_request%s\n",KCYN,KNRM);
-
+		
+		
 		send_to_queue((long)LOGIN_RESPONSE,aux);
+		
 }
 
 /*
@@ -198,15 +222,16 @@ void set_ultima_conexion(){
     }
 
     char aux[LAST_CONECTION_SIZE];
-    sprintf(aux,"%d-%02d-%02d %02d:%02d:%02d",ptm->tm_year + 1900,
+    sprintf(aux,"%d-%02d-%02d %02d:%02d",ptm->tm_year + 1900,
 	 ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, 
-           ptm->tm_min, ptm->tm_sec);
+           ptm->tm_min);
 
     printf("%s\n",aux );
 
     for(int32_t i=0; i<CANTIDAD_USUARIOS; i++){
 		if(strcmp(user_aux,usuarios[i]->usuario) == 0){
 			sprintf(usuarios[i]->ultima_conexion,"%s",aux);
+			usuarios[i]->ultima_conexion[strlen(usuarios[i]->ultima_conexion) - 1] = '\0';
 		}
 	}
 	return;
@@ -262,6 +287,7 @@ void names_request(){
 		printf("%sError alocando memoria%s\n",KRED,KNRM);
 		exit(1);
 	}
+	memset(credenciales,0,sizeof(credenciales));
 	sprintf(credenciales,"%s",encabezado);
 
 	for(int32_t i=0; i<CANTIDAD_USUARIOS; i++){
@@ -296,8 +322,6 @@ void password_change(){
 
 	change_password(credenciales);
 
-	actualizar_bd();
-
 	send_to_queue((long)PASSWORD_CHANGE_RESPONSE,"PASSWORD_CHANGE_RESPONSE");
 }
 
@@ -318,6 +342,8 @@ void change_password(char* datos){
 		}
 	}
 
+	actualizar_bd();
+
 }
 
 /*
@@ -328,6 +354,7 @@ void actualizar_bd(){
 	FILE *file;
 	file = fopen(base_datos_usuarios, "w+"); //para leer y escribir
 
+	if ( file != NULL ) {
 	//se empleó fputs y no resultó ser útil
 		for(int32_t i=0; i<CANTIDAD_USUARIOS; i++){
 			fprintf(file,"%s",usuarios[i]->usuario);
@@ -339,7 +366,8 @@ void actualizar_bd(){
 			fprintf(file,"%s",usuarios[i]->ultima_conexion);
 			fprintf(file,"%s","\n");
 		}
-		fclose(file);
-	
+		
+	}
+	fclose(file);
 
 }

@@ -25,6 +25,6 @@ typedef struct {
   int32_t index;							//el indice sirve para buscar y ordenar los archivos
   char nombre[ARCHIVO_NAME_SIZE];			//nombre del archivo
   char formato[ARCHIVO_FORMAT_SIZE];		//formato del archivo
-  ssize_t size;								//tamaño del archivo
+  float size;								//tamaño del archivo
   char hash[MD5_DIGEST_LENGTH];				//hash del archivo a ser comparado en el grabado
 } Archivo;

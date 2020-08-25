@@ -1,11 +1,16 @@
-FLAGS = -g -Wall -Werror -Wextra -Wconversion -pedantic
+FLAGS = -std=gnu11 -Wall -Werror -Wextra -Wconversion -pedantic -lssl -lcrypto -g
 
-all:
+all: cliente servidor 
+
+cliente:
 	cppcheck ./
-	gcc $(FLAGS) src/cliente.c src/funciones.c -o bin/client
-	gcc $(FLAGS) src/servidor.c src/funciones.c -o bin/server
-	gcc $(FLAGS) src/auth.c src/funciones.c -o bin/auth
-	gcc $(FLAGS) src/file.c src/funciones.c -o bin/file
+	gcc src/cliente.c src/funciones.c -o bin/client $(FLAGS)
+
+servidor:
+	cppcheck ./
+	gcc src/servidor.c src/funciones.c -o bin/server $(FLAGS)
+	gcc src/auth.c src/funciones.c -o bin/auth $(FLAGS)
+	gcc src/file.c src/funciones.c -o bin/file $(FLAGS)
 
 clean:
 	rm bin/*

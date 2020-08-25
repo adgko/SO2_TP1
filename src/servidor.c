@@ -118,7 +118,7 @@ void configurar_socket() {
 	Abre conexión para que se conecte un clietne
 */
 void escuchando(){
-	listen(sockfd, 1);
+	listen(sockfd, 5);
 	client_len = sizeof(client_addr);
 }
 
@@ -160,7 +160,7 @@ void conectar_cliente(){
 	Recibe el usuario y contraseña desde cliente
 */
 void rec_user(){
-	memset( buffer, 0, TAM );
+	memset( buffer, '\0', TAM );
 	n = recv( sock_cli, buffer, TAM, 0 );	
 	if ( n < 0 ) {								
 		perror( "lectura de socket" );
@@ -203,6 +203,8 @@ void verificar_respuesta(){
 		printf("%sUSUARIO BLOQUEADO: %s%s\n", KRED,nombre,KNRM);
 		enviar_a_cliente("2");
 		auth_flag=0;
+		exit_flag=1;
+		on_flag=0;
 	}
 }
 

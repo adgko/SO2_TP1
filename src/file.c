@@ -102,7 +102,7 @@ void guardar_datos(int32_t i,struct dirent *dir,char* path){
 	sprintf(archivos[i]->formato,"%s",strtok(NULL,"."));
 	archivos[i]->formato[strlen(archivos[i]->formato)]='\0';
 	calc_size(i, path);	
-	//sprintf(archivos[i]->hash,"%s",get_md5(path,0));
+	sprintf(archivos[i]->hash,"%s",get_MD5(path));
 
 }
 
@@ -114,7 +114,7 @@ void calc_size(int32_t i,char* path){
 	FILE* file = fopen(path, "rb"); //rb porque son archivos sin texto
 	if(file != NULL){
 		fseek(file,0,SEEK_END);
-		ssize_t size = ftell(file);
+		long int size = ftell(file);
 
 		if(size < 0){
 			// su ftell devuelve negativo, hay error
@@ -122,7 +122,8 @@ void calc_size(int32_t i,char* path){
 			size = INT_MAX;
 		}
 		//al terminar, pasa el tamaño en Mb a la estructura
-		archivos[i]->size=size/BYTES_TO_MB;
+		float aux = (float)size/BYTES_TO_MB;
+		archivos[i]->size=aux;
 
 		fclose(file);
 	}
@@ -132,7 +133,7 @@ void calc_size(int32_t i,char* path){
 	Abre conexión para que se conecte un clietne
 */
 void escuchando(){
-	listen(sockfd, 1);
+	listen(sockfd, 5);
 	client_len = sizeof(client_addr);
 }
 
@@ -161,8 +162,6 @@ void listen_user(){
 */
 void files_request(){
 
-	printf("%s4%s",KMAG,KNRM);
-
 	char* encabezado = "[Indice] - [Nombre] - [Formato] - [Tamaño (MB)] - [Hash]\n";
 	size_t size = strlen(encabezado);
 	char* guion = " - ";
@@ -170,7 +169,7 @@ void files_request(){
 	char indice[3] = "";
 	char size_aux[ARCHIVO_NAME_SIZE];		//se usa para guardar size por problema de conversion
 	for(int32_t i = 0; i < CANT_ARCHIVOS; i++) {
-		sprintf(size_aux,"%ld",archivos[i]->size);	//si no hago esto, hay un error de pointer a int
+		sprintf(size_aux,"%f",archivos[i]->size);	//si no hago esto, hay un error de pointer a int
 		size = size + strlen(indice) + strlen(archivos[i]->nombre) + strlen(guion) + 
 					strlen(archivos[i]->formato) + strlen(guion) + 
 					strlen(size_aux) + strlen(guion) +
@@ -181,11 +180,16 @@ void files_request(){
 	}
 
 	char files[size];
+	if(files == NULL){
+		printf("%sError alocando memoria%s\n",KRED,KNRM);
+		exit(1);
+	}
 	sprintf(files,"%s",encabezado);
+	
 	for(int32_t i = 0; i < CANT_ARCHIVOS; i++){
 		char aux[strlen(files)];
 		sprintf(aux,"%s",files);
-		sprintf(files,"%s%d%s%s%s%s%s%ld%s%s%s",aux,archivos[i]->index,guion,
+		sprintf(files,"%s%d%s%s%s%s%s%f%s%s%s",aux,archivos[i]->index,guion,
 				archivos[i]->nombre,guion,archivos[i]->formato,guion,
 				archivos[i]->size,guion,archivos[i]->hash,salto);
 	}

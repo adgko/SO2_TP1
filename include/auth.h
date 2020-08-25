@@ -3,6 +3,7 @@
 #define base_datos_usuarios "../archivos/users/users_credentials"
 
 void leer_bd();
+void vaciar_archivos();
 void listen_user();
 int32_t login(char*);
 int32_t get_bloqueado();

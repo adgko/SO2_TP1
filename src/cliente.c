@@ -178,7 +178,7 @@ int32_t login(){
 
 void comandos(){
 	while(1){
-		memset(buffer, '\0', TAM);			// con esto limpio el buffer del comando anterior
+		memset(buffer, 0, TAM);			// con esto limpio el buffer del comando anterior
 		printf("$");
 		fgets(buffer,TAM,stdin); 			// pido comando
 		if(buffer[0] != '\n'){				//si en el buffer no hay una nueva linea, envía
