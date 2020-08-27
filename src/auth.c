@@ -1,19 +1,14 @@
 #include "../include/auth.h"
 
-Usuario* usuarios[CANTIDAD_USUARIOS];
-char* mensaje;
-char user[USUARIO_TAM];
-char user_aux[USUARIO_TAM];
-
 int32_t main(){
 
 	printf("%sIniciando Auth Service%s\n", KBLU,KNRM );
 
 	leer_bd();
 
-	while(1){		//se queda esperando que en la cola haya algo para él
+	while(1)		//se queda esperando que en la cola haya algo para él
 		listen_user();
-	}
+	
 	exit(0);
 }
 
@@ -58,16 +53,16 @@ void leer_bd() {
 		}
 		sprintf(usuarios[i]->usuario, "%s", lineas[k++]);
 		usuarios[i]->usuario[strlen(usuarios[i]->usuario) - 1] = '\0';
-		printf("%s\n", usuarios[i]->usuario);
+		//printf("%s\n", usuarios[i]->usuario);
 		sprintf(usuarios[i]->password, "%s", lineas[k++]);
 		usuarios[i]->password[strlen(usuarios[i]->password) - 1] = '\0';
-		printf("%s\n", usuarios[i]->password);
+		//printf("%s\n", usuarios[i]->password);
 		sprintf(usuarios[i]->intentos, "%s", lineas[k++]);
 		usuarios[i]->intentos[strlen(usuarios[i]->intentos) - 1] = '\0';
-		printf("%s\n", usuarios[i]->intentos);
+		//printf("%s\n", usuarios[i]->intentos);
 		sprintf(usuarios[i]->ultima_conexion, "%s", lineas[k++]);
 		usuarios[i]->ultima_conexion[strlen(usuarios[i]->ultima_conexion) - 1] = '\0';
-		printf("%s\n", usuarios[i]->ultima_conexion);
+		//printf("%s\n", usuarios[i]->ultima_conexion);
 		
 	}
 }
@@ -109,9 +104,6 @@ void listen_user(){
 	if(errno != ENOMSG){
 		password_change();
 	}
-
-	//actualiza el archivo antes de preguntar de nuevo
-	//actualizar_bd();
 }
 
 /*
@@ -132,10 +124,8 @@ void login_request(){
 
 		printf("%s\n",user );
 
-		int32_t rta = verificar_log(log);
-
 		char aux[3] = "";
-		sprintf(aux,"%d",rta);
+		sprintf(aux,"%d",log);
 		
 		
 		send_to_queue((long)LOGIN_RESPONSE,aux);
@@ -161,7 +151,7 @@ int32_t login(char* credenciales){
 
 	for(int32_t i = 0; i < CANTIDAD_USUARIOS; i++) {
 		if( strcmp(usuario, usuarios[i]->usuario) == 0 ) {
-			sprintf(user_aux,"%s",usuario);
+			sprintf(user_aux,"%s",usuario);		//lo almaceno para el get_bloqueado
 			if(get_bloqueado()){
 				if( strcmp(password, usuarios[i]->password) == 0 ) {
 					set_ultima_conexion();
@@ -246,21 +236,6 @@ int32_t set_intentos(int32_t i){
 	aux = atoi(usuarios[i]->intentos);
 	aux++;
 	return aux;
-}
-/*
-	Valida la respuesta de login. 0 es datos incorrectos,
-	1 es usuario logueado y 2 es usuario bloqueado
-*/
-int32_t verificar_log(int32_t log){
-	if(log == 0){
-		return 0;
-	}
-	else if(log == 1){
-		return 1;
-	}
-	else{
-		return 2;
-	}
 }
 
 /*

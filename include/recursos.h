@@ -103,4 +103,4 @@ struct msgbuf {
 int32_t get_queue();
 int32_t send_to_queue(long, char [MENSAJE_TAM] );
 char* recive_from_queue(long , int32_t );
-char* get_MD5(char* );
+void get_MD5(char*,char* );

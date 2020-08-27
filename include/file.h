@@ -2,6 +2,9 @@
 
 #define IMAGES_PATH "../archivos/cosa/"
 
+/*
+	Funciones empleadas por file
+*/
 void configurar_socket();
 void Lista_de_archivos();
 void archivos_error(int32_t);
@@ -28,3 +31,15 @@ typedef struct {
   float size;								//tamaño del archivo
   char hash[MD5_DIGEST_LENGTH];				//hash del archivo a ser comparado en el grabado
 } Archivo;
+
+/*
+	Variables empleadas por el file
+*/
+int32_t sockfd, sock_cli, puerto;
+ssize_t n;							// hubo que declarar n como ssize_t para que no pierda información al usarse en send() y recv()
+struct sockaddr_in serv_addr;
+struct sockaddr_in client_addr;
+char buffer[TAM], buffer_aux[MD5_DIGEST_LENGTH*2],direccion[20];
+uint32_t client_len;				//tamaño de la dirección del cliente
+char* mensaje_resp;
+Archivo* archivos[CANT_ARCHIVOS]; 

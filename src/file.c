@@ -1,18 +1,10 @@
 #include "../include/file.h"
 
-int32_t sockfd, sock_cli, puerto;
-ssize_t n;							// hubo que declarar n como ssize_t para que no pierda información al usarse en send() y recv()
-struct sockaddr_in serv_addr;
-struct sockaddr_in client_addr;
-char buffer[TAM], direccion[20];
-uint32_t client_len;				//tamaño de la dirección del cliente
-char* mensaje_resp;
-Archivo* archivos[CANT_ARCHIVOS]; 
+
 
 int32_t main(){
-	
-	//puerto = PUERTO_FILE.
 
+	printf("Probando MD5 1\n");
 	configurar_socket();
 
 	Lista_de_archivos();
@@ -50,6 +42,8 @@ void configurar_socket() {
 */
 void Lista_de_archivos(){
 
+	printf("Probando MD5 2\n");
+
 	DIR *d;
     struct dirent *dir;
     int32_t i = 0;
@@ -67,6 +61,7 @@ void Lista_de_archivos(){
 				sprintf(path, "%s%s", IMAGES_PATH, dir->d_name);
 				path[strlen(path)] = '\0';
 
+				printf("Probando MD5 3\n");
 				guardar_datos(i,dir,path);
 				i++;
 			}
@@ -96,13 +91,21 @@ void archivos_error(int32_t i){
 	en la estructura Archivo
 */
 void guardar_datos(int32_t i,struct dirent *dir,char* path){
+	printf("Probando MD5 4\n");
+	memset(buffer_aux,0,TAM);		//borro el buffer para que no se pise con otros MD5
 	archivos[i]->index=i;
 	sprintf(archivos[i]->nombre,"%s",strtok(dir->d_name,"."));
 	archivos[i]->nombre[strlen(archivos[i]->nombre)]='\0';
 	sprintf(archivos[i]->formato,"%s",strtok(NULL,"."));
 	archivos[i]->formato[strlen(archivos[i]->formato)]='\0';
 	calc_size(i, path);	
-	sprintf(archivos[i]->hash,"%s",get_MD5(path));
+	get_MD5(path,buffer_aux);
+	printf("Probando MD5 11\n");
+	printf("%s\n", buffer_aux);
+	sprintf(archivos[i]->hash,"%s",buffer_aux);
+	printf("Probando MD5 12\n");
+	printf("%s",archivos[i]->hash);
+	printf("Probando MD5 13\n");
 
 }
 

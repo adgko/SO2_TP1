@@ -1,26 +1,5 @@
 #include "../include/servidor.h"
 
-
-/*
-	declaración de variables
-	sacadas del ejemplo de socket
-	agrego auth_flag, con lo que sabré si el cliente está logueado
-*/
-int32_t sockfd, sock_cli, puerto;
-int32_t pid_auth, pid_file;
-ssize_t n;									// hubo que declarar n como ssize_t para que no pierda información al usarse en send() y recv()
-struct sockaddr_in serv_addr;
-struct sockaddr_in client_addr;
-struct hostent *server;
-struct hostent *server_file;
-int terminar;
-char buffer[TAM], direccion[20];
-int auth_flag, exit_flag, on_flag;					//bandera autenticación, salida y funcionamiento
-int32_t rta;								//respuesta del server al cliente
-uint32_t client_len;						//tamaño de la dirección del cliente
-char* mensaje_resp;
-char user[USUARIO_TAM];
-
 int32_t main( int32_t argc, char *argv[] ){
 		
 
@@ -34,14 +13,14 @@ int32_t main( int32_t argc, char *argv[] ){
 	puerto = atoi( argv[2] );
 
 	configurar_socket();
-	
 
     printf( "Proceso: %d - socket disponible: %d\n", getpid(), ntohs(serv_addr.sin_port) );
 
     escuchando();		//escucha por si se conecta un cliente
-	
-    //ejecutar_bin();		//ejecuta los binarios de auth y file
-    
+
+	/*
+	inicializa los procesos de autenticación y archivos
+	*/
     pid_auth = fork();
   		if ( pid_auth == 0 ) {
     		if( execv(AUTH_PATH, argv) == -1 ) {
@@ -60,10 +39,9 @@ int32_t main( int32_t argc, char *argv[] ){
    			exit(0);
 		}
 	
+
 	conectar_cliente();
-	exit_flag = 0;
-	auth_flag = 0;
-	on_flag = 1;
+	set_flags();
 
 	while(on_flag) {
 
@@ -123,29 +101,6 @@ void escuchando(){
 }
 
 /*
-	inicializa los procesos de autenticación y archivos
-*/
-/*
-void ejecutar_bin(){
-	pid_auth = fork();
-  		if ( pid_auth == 0 ) {
-    		if( execv(AUTH_PATH, (char* const*)NULL) == -1 ) {
-   			  perror("error en auth ");
-   			  exit(1);
-   			} 			
-   			exit(0);
-  		}
-  	pid_file = fork();
-  		if ( pid_file == 0 ) {
-    		if( execv(FILE_PATH, (char* const*)NULL) == -1 ) {
-   			  perror("error en file ");
-   			  exit(1);
-   			}   			
-   			exit(0);
-		}
-}
-*/
-/*
 	Conecta con el cliente que usó su dirección
 */
 void conectar_cliente(){
@@ -157,10 +112,18 @@ void conectar_cliente(){
 }
 
 /*
+	Inicializa las banderas para salir, autenticarse y mantener el programa corriendo
+*/
+void set_flags(){
+	exit_flag = 0;
+	auth_flag = 0;
+	on_flag = 1;
+}
+/*
 	Recibe el usuario y contraseña desde cliente
 */
 void rec_user(){
-	memset( buffer, '\0', TAM );
+	memset( buffer, 0, TAM );
 	n = recv( sock_cli, buffer, TAM, 0 );	
 	if ( n < 0 ) {								
 		perror( "lectura de socket" );
@@ -239,7 +202,7 @@ void middle(){
 		mensaje_comando = strtok(NULL," ");
 	}
 
-	fflush(stdout);
+	fflush(stdout);			//limpio buffer o se va a pisar
 
 	printf("%s - %s %s %s\n", user, comando, opcion, argumento );
 
@@ -295,7 +258,7 @@ void user_command( char *opcion, char *argumento) {
 		enviar_a_cliente(	" Opción Incorrecta\n"
 							" Escriba: user [opcion] <argumento>\n"
 							"	- ls : listado de usuarios\n"
-							"	- passwd <nueva contraseña> : cambio de contraseña");
+							"	- passwd <nueva contraseña> : cambio de contraseña\n");
 	}
 }
 
@@ -331,7 +294,7 @@ void user_passwd(char* clave) {
 	sprintf(cad_aux,"%s", clave);
 
 	send_to_queue((long) PASSWORD_CHANGE, cad_aux);
-	//free(cad_aux);
+	free(cad_aux);
 	recive_from_queue((long) PASSWORD_CHANGE_RESPONSE, 0);
 	enviar_a_cliente("Clave cambiada con exito");
 
@@ -353,7 +316,7 @@ void file_command(char *opcion, char *argumento) {
 		enviar_a_cliente(	" Opción Incorrecta\n"
 							" Escriba: file [opcion] <argumento>\n"
 							"	- ls : listado de archivos\n"
-							"	- down <nombre_archivo> : descarga de archivo");
+							"	- down <nombre_archivo> : descarga de archivo\n");
 	}
 }
 
@@ -397,5 +360,5 @@ void unknown_command() {
 						"Comandos aceptados:\n"
 						"	- user\n"
 						"	- file\n"
-						"	- exit");
+						"	- exit\n");
 }

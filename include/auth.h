@@ -2,6 +2,9 @@
 
 #define base_datos_usuarios "../archivos/users/users_credentials"
 
+/*
+	Funciones empleadas por auth
+*/
 void leer_bd();
 void vaciar_archivos();
 void listen_user();
@@ -10,7 +13,6 @@ int32_t get_bloqueado();
 void set_ultima_conexion();
 int32_t set_intentos(int32_t);
 void login_request();
-int32_t verificar_log(int32_t);
 void names_request();
 void password_change();
 void change_password(char*);
@@ -27,3 +29,11 @@ typedef struct {
   char intentos[INTENTOS_TAM];
   char ultima_conexion[LAST_CONECTION_SIZE];
 } Usuario;
+
+/*
+	Variables empleadas por el auth
+*/
+Usuario* usuarios[CANTIDAD_USUARIOS];
+char* mensaje;
+char user[USUARIO_TAM];		//el usuario ya logueado
+char user_aux[USUARIO_TAM];	//el usuario siendo validado

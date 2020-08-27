@@ -4,7 +4,7 @@
 //                                   COLA DE MENSAJE
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
-	crea la cola 
+	crea la cola si no existe y devuelve el id
 */
 int32_t get_queue() {
 
@@ -25,7 +25,7 @@ int32_t get_queue() {
 */
 int32_t send_to_queue(long id_mensaje, char mensaje[MENSAJE_TAM]) {
 
-	int32_t msqid = 0;
+	int32_t msqid=get_queue();
   if(strlen(mensaje) > MENSAJE_TAM) {
     perror("error, mensaje muy grande\n");
     exit(1);
@@ -34,16 +34,14 @@ int32_t send_to_queue(long id_mensaje, char mensaje[MENSAJE_TAM]) {
   mensaje_str.mtype = id_mensaje;
   sprintf(mensaje_str.mtext, "%s", mensaje);
 
-  msqid=get_queue();
   return msgsnd(msqid, &mensaje_str, sizeof mensaje_str.mtext, 0 );
 }
 
 char* recive_from_queue(long id_mensaje, int32_t flag) {
-  int32_t msqid = 0;
-  errno = 0;
+  int32_t msqid=get_queue();
+  errno = 0;			//seteo en 0 para que no se pise cada vez que lo llamo
   struct msgbuf mensaje_str = {id_mensaje, {0}};
-
-  msqid=get_queue();
+  
   if(msgrcv(msqid, &mensaje_str, sizeof mensaje_str.mtext, id_mensaje, flag) == -1) {
       if(errno != ENOMSG) {
         perror("error recibiendo mensaje de cola");
@@ -62,29 +60,46 @@ char* recive_from_queue(long id_mensaje, int32_t flag) {
 /*
 
 */
-char* get_MD5(char* archivo){
+void get_MD5(char* archivo,char* buffer){
+
+	printf("Probando MD5 6\n");
 	unsigned char c[MD5_DIGEST_LENGTH];
 	FILE *inFile = fopen (archivo, "rb");
 	MD5_CTX mdContext;
 	size_t bytes;
 	unsigned char data[1024];
 
+
 	if (inFile == NULL) {
 		printf ("%s no se pudo abrir el archivo%s\n", KRED,KNRM);
 		exit(1);
 	}
-	char* respuesta =malloc(MD5_DIGEST_LENGTH);	
-	if(respuesta == NULL){
-		printf("%sError alocando memoria%s\n",KRED,KNRM );
-		exit(1);
-	}
+		
+	printf("Probando MD5 7\n");
 	MD5_Init (&mdContext);
 	while ((bytes = fread (data, 1, 1024, inFile)) != 0)
 		MD5_Update (&mdContext, data, bytes);
 	MD5_Final (c,&mdContext);
-	for(int32_t i = 0; i < MD5_DIGEST_LENGTH; i++) 
-		sprintf(respuesta,"%02x",(unsigned int)c[i]);	
-	respuesta[strlen(respuesta)]='\0';
+
+	memset(buffer,0,MD5_DIGEST_LENGTH*2);
+
+	printf("Probando MD5 8\n");
+	for(int32_t i = 0; i < MD5_DIGEST_LENGTH; i++) {
+		char aux[strlen(buffer)];
+		sprintf(aux,"%s",buffer);
+		sprintf(buffer,"%s%02x",aux,(unsigned int)c[i]);
+		printf("%s\n", buffer);	
+	}
+
+	printf("Probando MD5 9\n");
+	buffer[strlen(buffer)]='\0';
+
+	//char* resp_aux = malloc(MD5_DIGEST_LENGTH);
+	//sprintf(resp_aux,"%s",respuesta);
+	//free(respuesta);
 	fclose (inFile);
-	return respuesta;
+
+	printf("%s\n",buffer );
+	printf("Probando MD5 10\n");
+	//return resp_aux;
 }
