@@ -17,6 +17,8 @@ void leer_server();
 void recibir_respuesta(int32_t);
 void descargar();
 void conect_to_files();
+void confirmar_files();
+
 
 /*
 	declaración de variables

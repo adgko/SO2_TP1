@@ -2,6 +2,9 @@
 
 int32_t main( int32_t argc, char *argv[] ){
 		
+	//sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL); //sigaction para que no se rompa con SIGPIPE
+	//sigset_t block_mask;
+	//sigaction.sa_mask = block_mask;
 
 	if ( argc < 2 ) {
 		fprintf(stderr,"Uso: %s <direccion ip><puerto>\n", argv[0]);		
@@ -85,9 +88,9 @@ void configurar_socket() {
 
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = inet_addr(direccion);
-	serv_addr.sin_port = htons( (uint16_t) puerto );
+	serv_addr.sin_port = htons( (uint16_t) puerto_connect );
 	if ( bind(sockfd, ( struct sockaddr *) &serv_addr, sizeof( serv_addr ) ) < 0 ) {
-		printf("Error de conexión\n");
+		perror( "conexion" );
 		exit(1);
 	}
 }

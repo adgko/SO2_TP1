@@ -58,48 +58,48 @@ char* recive_from_queue(long id_mensaje, int32_t flag) {
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
-
+	Función que calcula el MD5
+	recorre el archivo del path seleccionado realizando el cálculo
+	Si el size pasado por parámetro es 0, significa que está levantando el archivo por primera vez
+		en ese casolo lee completamente
+	Si el size pasado por parámetro es un número positivo, es el límite que tiene que leer
 */
-void get_MD5(char* archivo,char* buffer){
+char *get_MD5(char path[TAM], size_t size)
+{
+  FILE *file = fopen(path, "rb");
 
-	printf("Probando MD5 6\n");
-	unsigned char c[MD5_DIGEST_LENGTH];
-	FILE *inFile = fopen (archivo, "rb");
-	MD5_CTX mdContext;
-	size_t bytes;
-	unsigned char data[1024];
+  char buffer[TAM];
+  size_t bytes, bytes_read;
 
+  unsigned char c[MD5_DIGEST_LENGTH];
+  MD5_CTX md_context;
 
-	if (inFile == NULL) {
-		printf ("%s no se pudo abrir el archivo%s\n", KRED,KNRM);
-		exit(1);
-	}
-		
-	printf("Probando MD5 7\n");
-	MD5_Init (&mdContext);
-	while ((bytes = fread (data, 1, 1024, inFile)) != 0)
-		MD5_Update (&mdContext, data, bytes);
-	MD5_Final (c,&mdContext);
+  MD5_Init(&md_context);
 
-	memset(buffer,0,MD5_DIGEST_LENGTH*2);
+  if(size == 0)
+    {
+      while((bytes = fread(buffer, sizeof(char), sizeof(buffer), file)) != 0)
+        MD5_Update(&md_context, buffer, bytes);
+    }
+  else
+    {
+      bytes = 0;
+      while(bytes < size)
+        {
+          bytes_read = fread(buffer, sizeof(char), sizeof(buffer), file);
+          MD5_Update(&md_context, buffer, bytes_read);
+          bytes += bytes_read;
+        }
+    }
 
-	printf("Probando MD5 8\n");
-	for(int32_t i = 0; i < MD5_DIGEST_LENGTH; i++) {
-		char aux[strlen(buffer)];
-		sprintf(aux,"%s",buffer);
-		sprintf(buffer,"%s%02x",aux,(unsigned int)c[i]);
-		printf("%s\n", buffer);	
-	}
+  MD5_Final(c, &md_context);
+  fclose(file);
 
-	printf("Probando MD5 9\n");
-	buffer[strlen(buffer)]='\0';
+  char *md5 = malloc(MD5_DIGEST_LENGTH * 2 + 1);
 
-	//char* resp_aux = malloc(MD5_DIGEST_LENGTH);
-	//sprintf(resp_aux,"%s",respuesta);
-	//free(respuesta);
-	fclose (inFile);
+  for(int32_t i = 0; i < MD5_DIGEST_LENGTH; i++)
+    sprintf(&md5[i*2], "%02x", (uint) c[i]);
 
-	printf("%s\n",buffer );
-	printf("Probando MD5 10\n");
-	//return resp_aux;
+  return md5;
 }
+

@@ -15,7 +15,6 @@ int main(int argc, char *argv[])
 	puerto1 = atoi( argv[2] );
 	puerto2 = puerto1 + 1;
 	server = gethostbyname( argv[1] );
-	server_file = gethostbyname( argv[1] );
 
 	conect_to_server();			// configura el socket y se conecta con el servidor
 
@@ -55,8 +54,11 @@ void conect_to_server()
 	}
 	memset( (char *) &serv_addr, '0', sizeof(serv_addr) );
 	serv_addr.sin_family = AF_INET;
+	serv_addr_file.sin_family = AF_INET;
 	bcopy( (char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, (size_t)server->h_length );		// hay que castear server->h_length para que fucnione en bcopy
-	serv_addr.sin_port = htons( (uint16_t)puerto1 );
+	bcopy( (char *)server->h_addr, (char *)&serv_addr_file.sin_addr.s_addr, (size_t)server->h_length );
+	serv_addr.sin_port = htons( (uint16_t) puerto_connect );
+	serv_addr_file.sin_port = htons( (uint16_t) puerto_files );
 	if ( connect( sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr ) ) < 0 ) {
 		perror( "conexion" );
 		exit( 1 );
@@ -218,9 +220,146 @@ void recibir_respuesta(int32_t socket) {
 }
 
 void descargar(){
-	conect_to_files();
-
 	
+	printf("Probando download 1\n");
+	//long int size;
+	char buffer_aux[MD5_DIGEST_LENGTH*2];
+	memset(buffer_aux,0,MD5_DIGEST_LENGTH*2);
+
+	printf("Probando download 2\n");
+
+	conect_to_files();
+	memset( buffer,0,TAM);	
+	recibir_respuesta(sockfil);	//recibe el nombre del archivo
+	printf("%s\n", buffer);
+	printf("Probando download 3\n");
+	//printf("\n");
+/*
+	char archivo = strtok(buffer, " ");
+	//char archivo[strlen(buffer)];
+	//sprintf(archivo, "%s", buffer);
+	archivo[strlen(archivo)] = '\0';
+	memset( buffer,0,TAM);
+	printf("%s\n", archivo );
+
+	//fflush(stdout);
+	printf("Probando download 4\n");
+
+	//recibir_respuesta(sockfil);	//recibe taaño de archivo
+	printf("%s\n", buffer);
+	//fflush(stdout);
+	printf("Probando download 5\n");
+
+	char tamanio = strtok(buffer, " ");
+	//char tamanio[strlen(buffer)];
+	//sprintf(tamanio,"%s",buffer);
+	tamanio[strlen(tamanio)] = '\0';
+	printf("%s\n",tamanio );
+	//fflush(stdout);
+	printf("Probando download 6\n");
+*/
+
+	//recibir_datos();
+	printf("Probando download 4\n");
+	char* aux_data;
+
+	aux_data = strtok(buffer, " ");
+	char archivo[strlen(aux_data)];
+	sprintf(archivo, "%s", aux_data);
+
+	printf("Probando download 5\n");
+
+	aux_data = strtok(buffer, " ");
+	char tamanio[strlen(aux_data)];
+	sprintf(tamanio, "%s", aux_data);
+
+	printf("Probando download 6\n");
+
+	confirmar_files();
+
+	printf("Probando download 7\n");
+
+	printf("%sDescargando archivo%s\n",KGRN,KNRM );
+	FILE* file = fopen(PATH_USB, "wb+");	//escribe archivo y si no hay, lo crea
+	if(file != NULL){
+		ssize_t download=0;		//me sirve para saber cuanto descargo
+		char* aux_down = malloc(sizeof(download));
+		while((n=recv(sockfil,buffer,sizeof(buffer),0))>0){
+			sprintf(aux_down,"%ld",download);
+			if(!(strcmp(aux_down,tamanio))){		//si matchea el tamaño con lo que descargo, freno
+				break;
+			}
+			fwrite(buffer,sizeof(char),(size_t)n,file);
+			download+=n;	//a medida que lee, aumento el tamaño para sacar el MD5
+		}
+		//size = ftell(file);
+		fclose(file);
+		shutdown(sockfd,SHUT_RDWR);
+		close(sockfil);
+
+		float aux=(float)download/BYTES_TO_MB;
+		printf("%sDescarga terminada: %f MB%s\n",KBLU,aux,KNRM);
+		fflush(stdout);
+	}
+	else{
+		printf("%sError descargando archivo%s\n",KRED,KNRM);
+		shutdown(sockfd,SHUT_RDWR);
+		exit(1);
+	}
+
+	//get_MD5(PATH_USB,buffer_aux);
+	//printf("%sHash del archivo: %s%s\n",KBLU,buffer_aux,KNRM);
+	
+
+/*
+	ssize_t size;
+	if(!strcmp(buffer,"connOk")){
+		printf("conectando\n");
+		//se obtine socket y se establece conexion
+		sockfil = socket( AF_INET, SOCK_STREAM, 0 );
+		if ( sockfil < 0 ) {
+			perror( "ERROR apertura de socket" );
+			exit( 1 );
+		}
+
+		if ( connect( sockfil, (struct sockaddr *)&serv_addr_file, sizeof(serv_addr_file ) ) < 0 ) {
+			perror( "conexion" );
+			exit( 1 );
+		}
+	}else{
+		return;
+	}
+
+	memset( buffer, 0, TAM );
+
+	printf("iniciando descarga\n");
+	//se abre el archivo destino con modo wb para la escritura
+	FILE* file = fopen( PATH_USB, "wb" );
+
+  	if(file != NULL) {
+		ssize_t readed=0;
+
+		while((size=recv(sockfil, buffer, sizeof(buffer), 0))> 0 ){
+			if(!(strcmp(buffer,"EOF")))
+				break;
+			fwrite(buffer, sizeof(char), (size_t) size, file);
+			readed+=size;
+		}
+		//se obtienen los datos una vez finalizada la descarga
+		//char filename[ARCHIVO_NAME_SIZE]=PATH_USB;
+		//char auxBuffer[ARCHIVO_NAME_SIZE];
+		printf("Descarga terminada: %ld Bytes\n",readed);
+		//get_MD5(filename,auxBuffer);
+		//sprintf("Hash MD5 <%s>\n",auxBuffer);
+		fclose(file);
+		//getMbr(auxBuffer);
+		//printf("Datos de la tabla de particiones MBR:\n%s",auxBuffer);
+		//se cierra la conexion
+		shutdown(sockfil,SHUT_RDWR);
+	}else {
+      	perror("error al descargar archivo\n");
+		exit(1);
+  	}*/
 
 }
 
@@ -231,16 +370,24 @@ void descargar(){
 */
 void conect_to_files(){
 	sockfil = socket( AF_INET, SOCK_STREAM, 0 );
-	if ( sockfd < 0 ) {
+	if ( sockfil < 0 ) {
 		perror( "ERROR apertura de socket" );
 		exit( 1 );
 	}
-	memset( (char *) &serv_addr_file, '0', sizeof(serv_addr) );
-	serv_addr_file.sin_family = AF_INET;
-	bcopy( (char *)server_file->h_addr, (char *)&serv_addr_file.sin_addr.s_addr, (size_t)server_file->h_length );		// hay que castear server->h_length para que fucnione en bcopy
-	serv_addr_file.sin_port = htons( (uint16_t)puerto2 );
-	if ( connect( sockfd, (struct sockaddr *)&serv_addr_file, sizeof(serv_addr_file ) ) < 0 ) {
+	//memset( (char *) &serv_addr_file, '0', sizeof(serv_addr) );
+	//serv_addr_file.sin_family = AF_INET;
+	//bcopy( (char *)server->h_addr, (char *)&serv_addr_file.sin_addr.s_addr, (size_t)server->h_length );		// hay que castear server->h_length para que fucnione en bcopy
+	//serv_addr_file.sin_port = htons( (uint16_t)puerto2 );
+	if ( connect( sockfil, (struct sockaddr *)&serv_addr_file, sizeof(serv_addr_file ) ) < 0 ) {
 		perror( "conexion" );
 		exit( 1 );
+	}
+}
+
+void confirmar_files(){					
+	n = send( sockfil, "ok", strlen("ok"), 0 );
+	if ( n < 0 ) {
+	  perror( "error de envío\n");
+	  exit( 1 );
 	}
 }

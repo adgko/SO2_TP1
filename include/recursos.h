@@ -20,7 +20,7 @@
 /*
 	Tamaños de arreglos usados
 */
-#define TAM 256
+#define TAM 1024
 #define USUARIO_TAM 20
 #define USUARIO_BLOQUEADO_TAM 2
 #define LIMITE_INTENTOS 3
@@ -34,6 +34,8 @@
 #define USUARIO_CAMPOS 4
 #define TIME_SLEEP 2
 #define TIME_SLEEP_MICRO 800
+#define puerto_connect 8016
+#define puerto_files 8019
 
 /*
 	Etiquetas empleadas en la cola de mensaje
@@ -68,6 +70,7 @@
 #define ARCHIVO_NAME_SIZE 128
 #define ARCHIVO_FORMAT_SIZE 8
 #define BYTES_TO_MB 1048576
+#define PATH_USB "../archivos/download"
 
 /*
 	Variables empleadas para imprimir en colores
@@ -103,4 +106,4 @@ struct msgbuf {
 int32_t get_queue();
 int32_t send_to_queue(long, char [MENSAJE_TAM] );
 char* recive_from_queue(long , int32_t );
-void get_MD5(char*,char* );
+char *get_MD5(char path[TAM], size_t size);

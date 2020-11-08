@@ -4,7 +4,6 @@
 
 int32_t main(){
 
-	printf("Probando MD5 1\n");
 	configurar_socket();
 
 	Lista_de_archivos();
@@ -28,10 +27,10 @@ void configurar_socket() {
 	memset( (char *) &serv_addr, 0, sizeof(serv_addr) );
 
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = inet_addr(direccion);
-	serv_addr.sin_port = htons( (uint16_t) puerto );
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons( (uint16_t) puerto_files);
 	if ( bind(sockfd, ( struct sockaddr *) &serv_addr, sizeof( serv_addr ) ) < 0 ) {
-		printf("%sError de conexión%s\n",KRED,KNRM);
+		perror( "conexion" );
 		exit(1);
 	}
 }
@@ -41,8 +40,6 @@ void configurar_socket() {
 	los almacena en un buffer para ser leídos por el programa
 */
 void Lista_de_archivos(){
-
-	printf("Probando MD5 2\n");
 
 	DIR *d;
     struct dirent *dir;
@@ -61,9 +58,10 @@ void Lista_de_archivos(){
 				sprintf(path, "%s%s", IMAGES_PATH, dir->d_name);
 				path[strlen(path)] = '\0';
 
-				printf("Probando MD5 3\n");
 				guardar_datos(i,dir,path);
 				i++;
+
+
 			}
 
     	}
@@ -91,21 +89,16 @@ void archivos_error(int32_t i){
 	en la estructura Archivo
 */
 void guardar_datos(int32_t i,struct dirent *dir,char* path){
-	printf("Probando MD5 4\n");
-	memset(buffer_aux,0,TAM);		//borro el buffer para que no se pise con otros MD5
+
 	archivos[i]->index=i;
 	sprintf(archivos[i]->nombre,"%s",strtok(dir->d_name,"."));
 	archivos[i]->nombre[strlen(archivos[i]->nombre)]='\0';
 	sprintf(archivos[i]->formato,"%s",strtok(NULL,"."));
 	archivos[i]->formato[strlen(archivos[i]->formato)]='\0';
 	calc_size(i, path);	
-	get_MD5(path,buffer_aux);
-	printf("Probando MD5 11\n");
-	printf("%s\n", buffer_aux);
-	sprintf(archivos[i]->hash,"%s",buffer_aux);
-	printf("Probando MD5 12\n");
-	printf("%s",archivos[i]->hash);
-	printf("Probando MD5 13\n");
+	char *md5 = get_MD5(path,0);
+	sprintf(archivos[i]->hash,"%s",md5);
+
 
 }
 
@@ -114,9 +107,10 @@ void guardar_datos(int32_t i,struct dirent *dir,char* path){
 	cuantos bytes tiene, entonces lo asigna
 */
 void calc_size(int32_t i,char* path){
+
 	FILE* file = fopen(path, "rb"); //rb porque son archivos sin texto
 	if(file != NULL){
-		fseek(file,0,SEEK_END);
+		fseek(file,0L,SEEK_END);
 		long int size = ftell(file);
 
 		if(size < 0){
@@ -155,7 +149,9 @@ void listen_user(){
 
 	mensaje_resp = recive_from_queue((long)DOWNLOAD_REQUEST,MSG_NOERROR|IPC_NOWAIT);
 	if(errno != ENOMSG){
-		download_request();
+		//download_request();
+		printf("%sFunción fuera de servicio %s\n",KYEL,KNRM );
+		send_to_queue((long)DOWNLOAD_RESPONSE,"Función fuera de servicio");
 	}
 
 }
@@ -205,8 +201,6 @@ void files_request(){
 */
 void download_request(){
 
-	printf("%s5%s",KMAG,KNRM);
-
 	int32_t flag = 0;
 	int32_t indice_archivo = 0;
 	//busca que archivo matchea el nombre con el buscado
@@ -237,7 +231,7 @@ void conectar_enviar(int32_t indice_archivo){
 
 	conectar_cliente();
 	enviar_archivo(indice_archivo);
-	close(sock_cli);
+	//close(sock_cli);
 
 }
 
@@ -262,9 +256,8 @@ void enviar_archivo(int32_t i){
 	char* punto = ".";
 	char archivo[strlen(archivos[i]->nombre) + strlen(punto) + strlen(archivos[i]->formato)];
 	sprintf(archivo,"%s%s%s",archivos[i]->nombre,punto,archivos[i]->formato);
-	archivo[strlen(archivo)] = '\0';
-
-	enviar_a_cliente(archivo);
+	archivo[strlen(archivo)] = ' ';
+	printf("%s\n",archivo );
 
 	//crea el path donde va a buscar dicho archivo
 	char* path = malloc(strlen(IMAGES_PATH) + strlen(archivo));
@@ -273,7 +266,28 @@ void enviar_archivo(int32_t i){
 	path[strlen(path)] = '\0';
 
 
+	char tamanio[ARCHIVO_NAME_SIZE];
+	memset(tamanio,0,ARCHIVO_NAME_SIZE);
+	printf("%f\n",archivos[i]->size );
+	float aux = archivos[i]->size*BYTES_TO_MB;
+	sprintf(tamanio,"%f",aux);
+	tamanio[strlen(tamanio)] = ' ';
+	printf("%s\n",tamanio );
+
+	char* cad_aux = malloc(strlen(archivo) + strlen(tamanio));
+    if(cad_aux == NULL) {
+		perror("error de alocación\n");
+		exit(1);
+	}
+	sprintf(cad_aux, "%s%s", archivo, tamanio);
+	printf("%s\n",cad_aux );
+
+	enviar_a_cliente(cad_aux);
+
+	confirmacion_cliente();
+
 	enviar_a_cliente_archivo(path);
+
 }
 
 /*
@@ -285,6 +299,24 @@ void enviar_a_cliente(char* mensaje) {
 		printf("%sError enviando a cliente%s\n",KRED,KNRM );
 	  	exit( 1 );
 	}
+}
+
+void confirmacion_cliente(){
+	memset( buffer,0,TAM);
+	n = recv( sock_cli,buffer,TAM,0);
+	if ( n < 0 ) {
+	  perror( "error de recepción\n" );
+	  exit(1);
+	}
+
+	if(!strcmp(buffer,"ok")==0){
+		printf("%sError en la confirmación %s\n",KRED,KNRM );
+		shutdown(sockfd,SHUT_RDWR);
+		exit(1);
+	}
+
+	printf("%sDatos recibidos %s\n",KGRN,KNRM );
+	confirm_flag = 1;
 }
 
 /*
@@ -302,16 +334,24 @@ void enviar_a_cliente_archivo(char* path){
 
 	FILE* file = fopen(path, "rb"); //rb porque son archivos sin texto
 	if(file != NULL){
+		
 		while(fread(buffer, sizeof(char),sizeof(buffer), file) > 0){
 			n = send(sock_cli, buffer, sizeof(buffer),0);
 			if(n < 0){
 				printf("%sError enviando al cliente%s\n", KYEL,KNRM);
 			}
+			printf("%s\n",buffer );
+			printf("%sEnviando Archivos%s\n",KGRN,KNRM );
+			fclose(file);
 		}
-	fclose(file);	
+		
 	}
 	else{
-		printf("%sError enviando al cliente%s\n", KRED,KNRM);
+		printf("%sError abriendo archivo%s\n",KRED,KNRM );
+		exit(1);
 	}
 	free(path);
+	shutdown(sockfd,SHUT_RDWR);
+	
 }
+
