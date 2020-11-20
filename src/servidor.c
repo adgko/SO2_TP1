@@ -52,8 +52,9 @@ int32_t main( int32_t argc, char *argv[] ){
 			printf("%sAUTENTICANDO%s\n",KGRN,KNRM);
 
 			rec_user();				//recibo credenciales de usuario
+			printf("%s\n",buffer );
 
-			if( strcmp(buffer, "exit\n") == 0 ) {	//si pongo exit, sale
+			if( strcmp(buffer, "exit") == 0 ) {	//si pongo exit, sale
 				printf("%sSaliendo...%s\n",KBLU,KNRM);
 				break;
 			}
@@ -198,9 +199,10 @@ void middle(){
 		else if(i == 1){
 			sprintf(opcion,"%s", mensaje_comando);
 		}
-		else{
+		else {
 			sprintf(argumento,"%s",mensaje_comando);
 		}
+			
 
 		mensaje_comando = strtok(NULL," ");
 	}

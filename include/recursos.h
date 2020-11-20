@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/sendfile.h>
 #include <netinet/in.h>
 #include <netdb.h> 
 #include <sys/types.h>
@@ -13,8 +14,10 @@
 #include <errno.h>
 #include <sys/un.h>
 #include <limits.h>
+#include <sys/stat.h>
 #include <arpa/inet.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <openssl/md5.h>
 
 /*
@@ -67,10 +70,11 @@
 */
 #define PUERTO_FILE 1051
 #define CANT_ARCHIVOS 3
-#define ARCHIVO_NAME_SIZE 128
+#define ARCHIVO_NAME_SIZE 1024
 #define ARCHIVO_FORMAT_SIZE 8
 #define BYTES_TO_MB 1048576
-#define PATH_USB "../archivos/download"
+#define PATH_DESCARGAS "../archivos/download"
+#define PATH_USB "/dev/sdb"
 
 /*
 	Variables empleadas para imprimir en colores

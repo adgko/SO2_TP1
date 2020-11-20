@@ -44,6 +44,7 @@ int main(int argc, char *argv[])
 
 /*
 	Abre conexión con el socket server
+	Configura tanto el socket para conectarse con el server primario, como también para archivos.
 */
 void conect_to_server()
 {
@@ -75,12 +76,12 @@ void signal_handler()
 	sign.sa_handler = salida;
 	sigaction(SIGINT, &sign,  NULL);
 }
-void salida(int32_t exit_flag) {
-	if(exit_flag == 1){								// como y aestaba logueado, avisa al server que se va
-		printf("%sVuelvas prontoss%s \n",KBLU,KNRM);
-		fflush(stdout);
-		enviar_a_socket(sockfd, "exit\n");
-		}		
+void salida() {								
+	
+	printf("%sVuelvas prontoss%s \n",KBLU,KNRM);
+	fflush(stdout);
+	if(auth_flag == 1)
+		enviar_a_socket(sockfd, "exit");		// avisa al server que se va
 	exit(0);
 }
 
@@ -113,6 +114,7 @@ int32_t login(){
 		exit(1);
 	}
 	sprintf(cad_aux, "%s%s", usuario, password);			// almacena todos los valores en cad_aux
+	
 	/*
 		envío el usuario y contraseña al server y libero la memoria 
 		para que no se solape si tengo que ingresar los datos de nuevo
@@ -155,7 +157,7 @@ void validar_rta(){
 	}
 	else if(rta == 2) {
 		printf("\n%sUSUARIO BLOQUEADO%s\n\n",KRED,KNRM);
-		salida(0);
+		salida();
 	}
 }
 
@@ -166,7 +168,7 @@ void comandos(){
 		fgets(buffer,TAM,stdin); 			// pido comando
 		if(buffer[0] != '\n'){				//si en el buffer no hay una nueva linea, envía
 			if(strcmp(buffer, "exit\n") == 0){	//si se escribe "exit", cierra sesión y cierra el programa
-				salida(1);
+				salida();
 			}
 
 			enviar_comando();
@@ -201,15 +203,32 @@ void leer_server(){
 			printf("%sNo se encuentra el archivo%s\n",KYEL,KNRM);
 			printf("%sAsegurese de que este bien escrito%s\n",KYEL,KNRM);
 		}
+		/*
 		else if(strcmp(buffer, "descarga_si") == 0) {
 			descargar();
-		}
+		}*/
+		else if(strstr(buffer,"Download") != NULL)
+        {
+          //int32_t fifd = create_clsocket(ip, port_fi);
+        	conect_to_files();
+
+          printf("Writing...\n");
+
+          write_usb();
+
+          close(sockfil);
+        }
+
 		else {
 			printf("%s\n", buffer);
 			fflush(stdout);
 		}		
 	}
 }
+
+/*
+	Recibe la respuesta del Socket server
+*/
 void recibir_respuesta(int32_t socket) {
 	memset( buffer,0,TAM);
 	n = recv( socket,buffer,TAM,0);
@@ -219,12 +238,139 @@ void recibir_respuesta(int32_t socket) {
 	}
 }
 
+
+void write_usb()
+{
+  char *tok = strtok(buffer, " ");
+  tok = strtok(NULL, " ");
+
+  size_t size = 0;
+  size_t size_for_md5;
+  sscanf(tok, "%lud", &size);
+  size_for_md5 = size;
+
+  FILE *usb;
+  //char path_usb[TAM];
+  //tok = strtok(NULL, " ");
+  //strcpy(path_usb,tok);
+
+  char md5_recv[33];
+  tok = strtok(NULL, " ");
+  sprintf(md5_recv, "%s", tok);
+
+  usb = fopen(PATH_USB, "wb");
+
+  if(usb == NULL)
+    {
+      perror("open usb");
+      exit(EXIT_FAILURE);
+    }
+
+  do
+    {
+      n = recv(sockfil, buffer, TAM, 0);
+      //check_error((int) rw);
+      if ( n < 0 ) {
+	  	perror( "error de recepción\n" );
+	  	exit(1);
+	  }
+
+      fwrite(buffer, sizeof(char), (size_t) n, usb);
+
+      size -= (size_t) n;
+    }
+  while(size != 0);
+
+  sync();
+  fclose(usb);
+
+  printf("Done writing.\n");
+
+  char *md5 = get_MD5(PATH_USB, size_for_md5);
+
+  if(!strcmp(md5_recv, md5))
+    {
+      printf("Escritura exitosa.\n");
+      //show_mbr(PATH_USB);
+    }
+  else
+    printf("Escritura fallida.\n");
+}
+
+void show_mbr(char path_usb[TAM])
+{
+  FILE *usb = fopen(path_usb, "rb");
+
+  struct mbr table;
+
+  if(usb != NULL)
+    {
+      fseek(usb, 0L, SEEK_SET);
+      fseek(usb, 446, SEEK_CUR);
+
+      if(fread(&table, sizeof(table), 1, usb) > 0)
+        fclose(usb);
+    }
+  else
+    {
+      perror("read usb");
+      exit(EXIT_FAILURE);
+    }
+
+  printf("\nPartición 1:\n");
+
+  char boot[3], type[3];
+
+  sprintf(boot, "%02x", table.boot[0] & 0xff);
+
+  if(!strcmp(boot,"80"))
+    printf(" - Booteable: Si.\n");
+  else
+    printf(" - Booteable: No.\n");
+
+  sprintf(type, "%02x", table.type[0] & 0xff);
+
+  printf(" - Tipo de partición: %s\n", type);
+
+  char start[8] = "\0";
+  char size[8]  = "\0";
+
+  little_to_big(start, table.start);
+
+  long inicio = strtol(start, NULL, 16);
+  if (errno == ERANGE)
+    printf("Over/underflow %ld\n", inicio);
+
+  printf(" - Sector de inicio: %ld \n", inicio);
+
+  little_to_big(size, table.size);
+
+  long tamanio = strtol(size, NULL, 16);
+  if (errno == ERANGE)
+    printf("Over/underflow %ld\n", tamanio);
+
+  tamanio *= 512;
+  tamanio /= 1000000;
+
+  printf(" - Tamaño de la partición: %ld MB\n\n", tamanio);
+}
+
+inline void little_to_big(char big[8], char little[4])
+{
+  char byte[3];
+  for(int i = 2; i >= 0; i--)
+  {
+    sprintf(byte, "%02x", little[i] & 0xff);
+    strcat(big, byte);
+  }
+}
+
 void descargar(){
 	
 	printf("Probando download 1\n");
 	//long int size;
-	char buffer_aux[MD5_DIGEST_LENGTH*2];
-	memset(buffer_aux,0,MD5_DIGEST_LENGTH*2);
+	//char buffer_aux[MD5_DIGEST_LENGTH*2+1];
+	//memset(buffer_aux,0,MD5_DIGEST_LENGTH*2+1);
 
 	printf("Probando download 2\n");
 
@@ -261,21 +407,55 @@ void descargar(){
 
 	//recibir_datos();
 	printf("Probando download 4\n");
-	char* aux_data;
+/*
+	sprintf(aux_data,"%s",buffer);
 
-	aux_data = strtok(buffer, " ");
-	char archivo[strlen(aux_data)];
-	sprintf(archivo, "%s", aux_data);
+	char archivo[TAM];
+	archivo = strtok(aux_data," ");
+	archivo[strlen(archivo)] = '\0';
+	printf("%s\n",archivo );
+*/
+	buffer[strlen(buffer)-1] = '\0';
 
+	char archivo[TAM];
+	char tamanio[TAM];
+
+	aux_data = strtok(buffer," ");
+
+	for(int32_t i=0; aux_data != NULL; i++){
+		if(i==0){
+			sprintf(archivo,"%s",aux_data);
+		}
+		else if(i==1){
+			sprintf(tamanio,"%s",aux_data);
+		}
+		aux_data = strtok(NULL," ");
+	}
+	//fflush(stdout);
+
+	printf("%s\n",archivo );
+	printf("%s\n",tamanio );
 	printf("Probando download 5\n");
+/*
+	char tamanio[TAM];
+	tamanio = strtok(aux_data," ");
+	archivo[strlen(archivo)] = '\0';
+	printf("%s\n",archivo );
 
 	aux_data = strtok(buffer, " ");
 	char tamanio[strlen(aux_data)];
 	sprintf(tamanio, "%s", aux_data);
-
+	tamanio[strlen(tamanio)] = '\0';
+	printf("%s\n",tamanio );
+*/
 	printf("Probando download 6\n");
 
-	confirmar_files();
+	float aux_size = strtof(tamanio,NULL);
+	float size = aux_size*BYTES_TO_MB;
+	//size[sizeof(size)] = ' ';
+	printf("%f\n",size );
+
+	//confirmar_files();
 
 	printf("Probando download 7\n");
 
@@ -283,10 +463,8 @@ void descargar(){
 	FILE* file = fopen(PATH_USB, "wb+");	//escribe archivo y si no hay, lo crea
 	if(file != NULL){
 		ssize_t download=0;		//me sirve para saber cuanto descargo
-		char* aux_down = malloc(sizeof(download));
 		while((n=recv(sockfil,buffer,sizeof(buffer),0))>0){
-			sprintf(aux_down,"%ld",download);
-			if(!(strcmp(aux_down,tamanio))){		//si matchea el tamaño con lo que descargo, freno
+			if(download == size){		//si matchea el tamaño con lo que descargo, freno
 				break;
 			}
 			fwrite(buffer,sizeof(char),(size_t)n,file);

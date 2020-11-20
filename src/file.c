@@ -4,15 +4,15 @@
 
 int32_t main(){
 
-	configurar_socket();
+	configurar_socket();	// configura y abre el socket para transmitir 
 
-	Lista_de_archivos();
+	Lista_de_archivos();	// levanta los archivos en una base de datos
 
-	escuchando();
+	escuchando();			// espera que se conecte un socket
 
 	while(1){
 
-		listen_user();
+		listen_user();		// lee la cola de mensajes para saber si se envió ls o down
 		sleep(TIME_SLEEP);
 	}
 
@@ -91,13 +91,18 @@ void archivos_error(int32_t i){
 void guardar_datos(int32_t i,struct dirent *dir,char* path){
 
 	archivos[i]->index=i;
-	sprintf(archivos[i]->nombre,"%s",strtok(dir->d_name,"."));
+	printf("%d\n", archivos[i]->index);										// indice
+	sprintf(archivos[i]->nombre,"%s",strtok(dir->d_name,"."));	// nombre
 	archivos[i]->nombre[strlen(archivos[i]->nombre)]='\0';
-	sprintf(archivos[i]->formato,"%s",strtok(NULL,"."));
+	printf("%s\n",archivos[i]->nombre );
+	sprintf(archivos[i]->formato,"%s",strtok(NULL,"."));		// formato
 	archivos[i]->formato[strlen(archivos[i]->formato)]='\0';
-	calc_size(i, path);	
-	char *md5 = get_MD5(path,0);
+	printf("%s\n", archivos[i]->formato);
+	calc_size(i, path);			
+	printf("%f\n", archivos[i]->size);								// tamaño
+	char *md5 = get_MD5(path,0);								// md5
 	sprintf(archivos[i]->hash,"%s",md5);
+	printf("%s\n", archivos[i]->hash);
 
 
 }
@@ -130,7 +135,7 @@ void calc_size(int32_t i,char* path){
 	Abre conexión para que se conecte un clietne
 */
 void escuchando(){
-	listen(sockfd, 5);
+	listen(sockfd, 1);
 	client_len = sizeof(client_addr);
 }
 
@@ -147,11 +152,12 @@ void listen_user(){
 		files_request();
 	}
 
+	//el server solicita un archivo para que envíe al cliente
 	mensaje_resp = recive_from_queue((long)DOWNLOAD_REQUEST,MSG_NOERROR|IPC_NOWAIT);
 	if(errno != ENOMSG){
-		//download_request();
-		printf("%sFunción fuera de servicio %s\n",KYEL,KNRM );
-		send_to_queue((long)DOWNLOAD_RESPONSE,"Función fuera de servicio");
+		download_request();
+		//printf("%sFunción fuera de servicio %s\n",KYEL,KNRM );
+		//send_to_queue((long)DOWNLOAD_RESPONSE,"Función fuera de servicio");
 	}
 
 }
@@ -200,12 +206,14 @@ void files_request(){
 	envía dicho archivo
 */
 void download_request(){
-
+/*
 	int32_t flag = 0;
 	int32_t indice_archivo = 0;
 	//busca que archivo matchea el nombre con el buscado
 	for(int32_t i=0; i < CANT_ARCHIVOS; i++){
-		if(strcmp(archivos[i]->nombre,mensaje_resp)==0){
+		char aux[strlen(archivos[i]->nombre)+strlen(".")+strlen(archivos[i]->formato)];		//se cambió comparación con nombre por esto, 
+		sprintf(aux,"%s.%s",archivos[i]->nombre,archivos[i]->formato);						// porque no podía encontrar el archivo sino
+		if(strcmp(aux,mensaje_resp)==0){
 			flag = 1;
 			indice_archivo = i;
 		}
@@ -221,7 +229,134 @@ void download_request(){
 
 		conectar_enviar(indice_archivo);
 
-	}
+	}*/
+	printf("Probando download 1\n");
+	char img[TAM];
+    long size = 0;
+	//char *tok = strtok(buffer, " ");
+
+	printf("Probando download 2\n");
+
+	strcpy(img, IMAGES_PATH); /* Nombre de la imagen */
+  	//strcat(img, "/");
+  	strcat(img, "bionicpup32.iso");
+
+  	printf("%s\n",img );
+
+  	printf("Probando download 3\n");
+
+  	//tok = strtok(NULL, " "); /* Dispositivo a escribir */
+  	//char usb[TAM];
+  	//strcpy(usb,tok);
+
+  	//printf("%s\n", usb);
+
+  	printf("Probando download 4\n");
+
+  	FILE *imgn;
+  	imgn = fopen(img, "r");
+
+  	if(imgn == NULL)
+  	{
+    	perror("file");
+    	//strcpy(buffer, "La imagen no existe.\n");
+    	//msgsnd(msqid, &buf, sizeof(buf.msg), 0);
+    	send_to_queue((long)DOWNLOAD_RESPONSE,"descarga_no");
+    	return;
+  	}
+
+  	printf("Probando download 5\n");
+
+  	fseek(imgn, 0, SEEK_END); /* Calcula el tamaño de la imagen */
+  	size = ftell(imgn);
+  	fclose(imgn);
+
+  	printf("Probando download 6\n");
+
+  	char size_s[TAM] = "";
+  	sprintf(size_s, "%ld", size);
+
+  	printf("%s\n",size_s );
+
+  	printf("Probando download 7\n");
+
+  	char *md5s = get_MD5(img, 0);
+
+  	sprintf(buffer, "Download %s %s", size_s, md5s);
+  	printf("%s\n",buffer);
+
+  	printf("Probando download 8\n");
+
+  	//msgsnd(msqid, &buf, sizeof(buf.msg), 0);
+  	send_to_queue((long)DOWNLOAD_RESPONSE,buffer);
+
+  	printf("Probando download 9\n");
+
+  	//int fifd = -1;
+    conectar_cliente();
+
+    printf("Probando download 10\n");
+
+    send_image(img, &size);
+
+    printf("Probando download 11\n");
+
+
+}
+
+/*
+void start_listening(int sockfd, char *ip)
+{
+  //sockfd = create_svsocket(ip, port_fi);
+	conectar_cliente();
+
+  struct sockaddr_in cl_addr;
+  uint cl_len;
+  char cl_ip[STR_LEN];
+
+  printf("Esuchando en puerto %d...\n", puerto_files);
+
+  listen(sock_cli, 1);
+  cl_len = sizeof(cl_addr);
+
+  //int newfd;
+  //newfd = accept(sockfd, (struct sockaddr *) &cl_addr, &cl_len);
+  //check_error(newfd);
+
+  //inet_ntop(AF_INET, &(cl_addr.sin_addr), cl_ip, INET_ADDRSTRLEN);
+  printf("Conexión aceptada a %s\n", cl_ip);
+
+  close(sock_cli);
+  //return newfd;
+}*/
+
+void send_image(char* img, long *size)
+{
+  int32_t imgfd;
+
+  imgfd = open(img, O_RDONLY);
+  //check_error(imgfd);
+  if(imgfd == -1)
+  		{
+    		perror("error");
+    		exit(EXIT_FAILURE);
+  		}
+
+  printf("%s\n", "  FS: Sending file...");
+
+  size_t to_send = (size_t) size;
+  ssize_t sent;
+  off_t offset = 0;
+
+  while(((sent = sendfile(sock_cli, imgfd, &offset, to_send)) > 0)
+        && (to_send > 0))
+  {
+    to_send -= (size_t) sent;
+  }
+
+  printf("  FS: %lu %s\n", *size, "sent.");
+
+  close(imgfd);
 }
 
 /*
@@ -251,40 +386,34 @@ void conectar_cliente(){
 */
 void enviar_archivo(int32_t i){
 
-	//guarda en un buffer el nombre y formato del archivo, separado por un punto
-	// para poder encontrarlo en el directorio
-	char* punto = ".";
-	char archivo[strlen(archivos[i]->nombre) + strlen(punto) + strlen(archivos[i]->formato)];
-	sprintf(archivo,"%s%s%s",archivos[i]->nombre,punto,archivos[i]->formato);
-	archivo[strlen(archivo)] = ' ';
-	printf("%s\n",archivo );
+	//guarda el nombre del archivo para enviarlo al cliente y usarlo en el path
+	sprintf(nombre_archivo,"%s",mensaje_resp);
+	nombre_archivo[strlen(nombre_archivo)] = '\0';
 
 	//crea el path donde va a buscar dicho archivo
-	char* path = malloc(strlen(IMAGES_PATH) + strlen(archivo));
+	char* path = malloc(strlen(IMAGES_PATH) + strlen(nombre_archivo));
 	verificar_path(path);
-	sprintf(path,"%s%s",IMAGES_PATH,archivo);
+	memset(path,0,strlen(path));
+	sprintf(path,"%s%s",IMAGES_PATH,nombre_archivo);
 	path[strlen(path)] = '\0';
 
 
 	char tamanio[ARCHIVO_NAME_SIZE];
 	memset(tamanio,0,ARCHIVO_NAME_SIZE);
-	printf("%f\n",archivos[i]->size );
-	float aux = archivos[i]->size*BYTES_TO_MB;
-	sprintf(tamanio,"%f",aux);
-	tamanio[strlen(tamanio)] = ' ';
-	printf("%s\n",tamanio );
+	sprintf(tamanio,"%f",archivos[i]->size);
+	tamanio[strlen(tamanio)] = '\0';
 
-	char* cad_aux = malloc(strlen(archivo) + strlen(tamanio));
+	char* cad_aux = malloc(strlen(nombre_archivo) + strlen(tamanio));
     if(cad_aux == NULL) {
 		perror("error de alocación\n");
 		exit(1);
 	}
-	sprintf(cad_aux, "%s%s", archivo, tamanio);
+	sprintf(cad_aux, "%s %s", nombre_archivo, tamanio);
 	printf("%s\n",cad_aux );
 
 	enviar_a_cliente(cad_aux);
 
-	confirmacion_cliente();
+	//confirmacion_cliente();
 
 	enviar_a_cliente_archivo(path);
 

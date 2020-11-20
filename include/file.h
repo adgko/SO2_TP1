@@ -1,6 +1,6 @@
 #include "../include/recursos.h"
 
-#define IMAGES_PATH "../archivos/cosa/"
+#define IMAGES_PATH "../archivos/img/"
 
 /*
 	Funciones empleadas por file
@@ -14,10 +14,12 @@ void escuchando();
 void listen_user();
 void files_request();
 void download_request();
+void send_image(char*, long*);
+void start_listening(int , char*);
 void conectar_cliente();
 void conectar_enviar(int32_t );
 void enviar_a_cliente(char* );
-void enviar_archivo(int32_t );
+void enviar_archivo(int32_t);
 void verificar_path(char* );
 void enviar_a_cliente_archivo(char* path);
 void confirmacion_cliente();
@@ -45,3 +47,4 @@ uint32_t client_len;				//tamaño de la dirección del cliente
 char* mensaje_resp;
 Archivo* archivos[CANT_ARCHIVOS]; 
 int32_t confirm_flag = 0;
+char nombre_archivo[TAM];
