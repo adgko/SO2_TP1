@@ -1,10 +1,6 @@
 #include "../include/servidor.h"
 
 int32_t main( int32_t argc, char *argv[] ){
-		
-	//sigaction(SIGPIPE, &(struct sigaction){SIG_IGN}, NULL); //sigaction para que no se rompa con SIGPIPE
-	//sigset_t block_mask;
-	//sigaction.sa_mask = block_mask;
 
 	if ( argc < 2 ) {
 		fprintf(stderr,"Uso: %s <direccion ip><puerto>\n", argv[0]);		
@@ -68,7 +64,7 @@ int32_t main( int32_t argc, char *argv[] ){
 		else{
 			while(exit_flag==0){
 				rec_user();
-				middle();			// recibe comandos del user
+				inter();			// recibe comandos del user
 			}
 
 		}
@@ -178,7 +174,7 @@ void verificar_respuesta(){
 /*
 	Obtiene el comando a enviar y funciona como intermediario
 */
-void middle(){
+void inter(){
 	buffer[strlen(buffer)-1]='\0'; //coloca un valor final al final del comando
 
 	/*

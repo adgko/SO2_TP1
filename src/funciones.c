@@ -1,7 +1,7 @@
 #include "../include/recursos.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                   COLA DE MENSAJE
+//                                               COLA DE MENSAJE
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*
 	crea la cola si no existe y devuelve el id
@@ -54,7 +54,7 @@ char* recive_from_queue(long id_mensaje, int32_t flag) {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-//								MD5
+//								                          MD5
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
@@ -103,3 +103,74 @@ char *get_MD5(char path[TAM], size_t size)
   return md5;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                             MBR
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void show_MBR(char path_usb[TAM])
+{
+  FILE *usb = fopen(path_usb, "rb");
+
+  struct mbr table;
+
+  if(usb != NULL)
+    {
+      fseek(usb, 0L, SEEK_SET);
+      fseek(usb, 446, SEEK_CUR);
+
+      if(fread(&table, sizeof(table), 1, usb) > 0)
+        fclose(usb);
+    }
+  else
+    {
+      perror("read usb");
+      exit(EXIT_FAILURE);
+    }
+
+  printf("\nPartición 1:\n");
+
+  char boot[3], type[3];
+
+  sprintf(boot, "%02x", table.boot[0] & 0xff);
+
+  if(!strcmp(boot,"80"))
+    printf(" - Booteable: Si.\n");
+  else
+    printf(" - Booteable: No.\n");
+
+  sprintf(type, "%02x", table.type[0] & 0xff);
+
+  printf(" - Tipo de partición: %s\n", type);
+
+  char start[8] = "\0";
+  char size[8]  = "\0";
+
+  little_to_big(start, table.start);
+
+  long inicio = strtol(start, NULL, 16);
+  if (errno == ERANGE)
+    printf("Over/underflow %ld\n", inicio);
+
+  printf(" - Sector de inicio: %ld \n", inicio);
+
+  little_to_big(size, table.size);
+
+  long tamanio = strtol(size, NULL, 16);
+  if (errno == ERANGE)
+    printf("Over/underflow %ld\n", tamanio);
+
+  tamanio *= 512;
+  tamanio /= 1000000;
+
+  printf(" - Tamaño de la partición: %ld MB\n\n", tamanio);
+}
+
+inline void little_to_big(char big[8], char little[4])
+{
+  char byte[3];
+  for(int i = 2; i >= 0; i--)
+  {
+    sprintf(byte, "%02x", little[i] & 0xff);
+    strcat(big, byte);
+  }
+}

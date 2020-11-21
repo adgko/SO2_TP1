@@ -12,7 +12,7 @@ void rec_user();
 void enviar_a_cola_local(long , char [MENSAJE_TAM]);
 void enviar_a_cliente(char*);
 void verificar_respuesta();
-void middle();
+void inter();
 void validar_comando();
 void exit_command();
 void user_command( char*, char*);

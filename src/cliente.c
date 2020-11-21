@@ -161,6 +161,9 @@ void validar_rta(){
 	}
 }
 
+/*
+	Solicita comandos, si es exit, cerrará la sesión, sino los enviará al server para que se encargue
+*/
 void comandos(){
 	while(1){
 		memset(buffer, 0, TAM);			// con esto limpio el buffer del comando anterior
@@ -197,26 +200,24 @@ void enviar_comando(){
 */
 void leer_server(){
 	if(buffer[0] != '\0'){		//por si el mensaje es nulo
+
 		printf("recibiendo respuesta\n");
 		recibir_respuesta(sockfd);
+
 		if(strcmp(buffer, "descarga_no") == 0){
 			printf("%sNo se encuentra el archivo%s\n",KYEL,KNRM);
 			printf("%sAsegurese de que este bien escrito%s\n",KYEL,KNRM);
 		}
-		/*
-		else if(strcmp(buffer, "descarga_si") == 0) {
-			descargar();
-		}*/
-		else if(strstr(buffer,"Download") != NULL)
-        {
-          //int32_t fifd = create_clsocket(ip, port_fi);
-        	conect_to_files();
 
-          printf("Writing...\n");
+		else if(strstr(buffer,"Download") != NULL){		// Si alguna parde del mensaje dice "Downdload", entra acá	
+        												// Esto se debe a que el server envía Download tamaño y hash MD5
+        	conect_to_files();							
 
-          write_usb();
+        	printf("%sEscribiendo USB %s%s\n", KGRN,PATH_USB,KNRM);
 
-          close(sockfil);
+        	escribir_usb();
+
+        	close(sockfil);
         }
 
 		else {
@@ -238,26 +239,30 @@ void recibir_respuesta(int32_t socket) {
 	}
 }
 
-
-void write_usb()
+/*
+	Si el archivo es enviado, será escrito en un USB
+*/
+void escribir_usb()
 {
   char *tok = strtok(buffer, " ");
   tok = strtok(NULL, " ");
-
   size_t size = 0;
-  size_t size_for_md5;
+  size_t md5_aux;
+
+  /*
+	Almaceno el tamaño que recibo para poder calcular el MD5
+  */	
   sscanf(tok, "%lud", &size);
-  size_for_md5 = size;
+  md5_aux = size;
 
-  FILE *usb;
-  //char path_usb[TAM];
-  //tok = strtok(NULL, " ");
-  //strcpy(path_usb,tok);
-
-  char md5_recv[33];
+  /*
+	Almaceno el MD5 que me llegó para compararlo luego
+  */
+  char md5_recv[MD5_DIGEST_LENGTH*2+1];
   tok = strtok(NULL, " ");
   sprintf(md5_recv, "%s", tok);
 
+  FILE *usb;
   usb = fopen(PATH_USB, "wb");
 
   if(usb == NULL)
@@ -266,280 +271,44 @@ void write_usb()
       exit(EXIT_FAILURE);
     }
 
+  	// lo que recibe, se escribe en un archivo en el pendrive
+  	/*
+		Se emplea un bucle do while para asegurar que se cumple al menos una vez el ciclo
+		y luego comprueba en cada iteración
+  	*/
   do
     {
       n = recv(sockfil, buffer, TAM, 0);
-      //check_error((int) rw);
       if ( n < 0 ) {
 	  	perror( "error de recepción\n" );
 	  	exit(1);
 	  }
 
       fwrite(buffer, sizeof(char), (size_t) n, usb);
-
       size -= (size_t) n;
     }
   while(size != 0);
 
-  sync();
+  sync();			// se emplea sync porque sino se pisa el buffer cuando envío más comandos
   fclose(usb);
 
-  printf("Done writing.\n");
+  printf("%sEscritura de USB terminada %s\n",KGRN,KNRM);
 
-  char *md5 = get_MD5(PATH_USB, size_for_md5);
+  char *md5 = get_MD5(PATH_USB, md5_aux);
 
+  /*
+	si los MD5 matchean, puedo marcar que fue exitosa y mostrar MBR
+	si no, se dirá que falló
+  */
   if(!strcmp(md5_recv, md5))
     {
       printf("Escritura exitosa.\n");
-      //show_mbr(PATH_USB);
+      show_MBR(PATH_USB);
     }
   else
     printf("Escritura fallida.\n");
 }
 
-void show_mbr(char path_usb[TAM])
-{
-  FILE *usb = fopen(path_usb, "rb");
-
-  struct mbr table;
-
-  if(usb != NULL)
-    {
-      fseek(usb, 0L, SEEK_SET);
-      fseek(usb, 446, SEEK_CUR);
-
-      if(fread(&table, sizeof(table), 1, usb) > 0)
-        fclose(usb);
-    }
-  else
-    {
-      perror("read usb");
-      exit(EXIT_FAILURE);
-    }
-
-  printf("\nPartición 1:\n");
-
-  char boot[3], type[3];
-
-  sprintf(boot, "%02x", table.boot[0] & 0xff);
-
-  if(!strcmp(boot,"80"))
-    printf(" - Booteable: Si.\n");
-  else
-    printf(" - Booteable: No.\n");
-
-  sprintf(type, "%02x", table.type[0] & 0xff);
-
-  printf(" - Tipo de partición: %s\n", type);
-
-  char start[8] = "\0";
-  char size[8]  = "\0";
-
-  little_to_big(start, table.start);
-
-  long inicio = strtol(start, NULL, 16);
-  if (errno == ERANGE)
-    printf("Over/underflow %ld\n", inicio);
-
-  printf(" - Sector de inicio: %ld \n", inicio);
-
-  little_to_big(size, table.size);
-
-  long tamanio = strtol(size, NULL, 16);
-  if (errno == ERANGE)
-    printf("Over/underflow %ld\n", tamanio);
-
-  tamanio *= 512;
-  tamanio /= 1000000;
-
-  printf(" - Tamaño de la partición: %ld MB\n\n", tamanio);
-}
-
-inline void little_to_big(char big[8], char little[4])
-{
-  char byte[3];
-  for(int i = 2; i >= 0; i--)
-  {
-    sprintf(byte, "%02x", little[i] & 0xff);
-    strcat(big, byte);
-  }
-}
-
-void descargar(){
-	
-	printf("Probando download 1\n");
-	//long int size;
-	//char buffer_aux[MD5_DIGEST_LENGTH*2+1];
-	//memset(buffer_aux,0,MD5_DIGEST_LENGTH*2+1);
-
-	printf("Probando download 2\n");
-
-	conect_to_files();
-	memset( buffer,0,TAM);	
-	recibir_respuesta(sockfil);	//recibe el nombre del archivo
-	printf("%s\n", buffer);
-	printf("Probando download 3\n");
-	//printf("\n");
-/*
-	char archivo = strtok(buffer, " ");
-	//char archivo[strlen(buffer)];
-	//sprintf(archivo, "%s", buffer);
-	archivo[strlen(archivo)] = '\0';
-	memset( buffer,0,TAM);
-	printf("%s\n", archivo );
-
-	//fflush(stdout);
-	printf("Probando download 4\n");
-
-	//recibir_respuesta(sockfil);	//recibe taaño de archivo
-	printf("%s\n", buffer);
-	//fflush(stdout);
-	printf("Probando download 5\n");
-
-	char tamanio = strtok(buffer, " ");
-	//char tamanio[strlen(buffer)];
-	//sprintf(tamanio,"%s",buffer);
-	tamanio[strlen(tamanio)] = '\0';
-	printf("%s\n",tamanio );
-	//fflush(stdout);
-	printf("Probando download 6\n");
-*/
-
-	//recibir_datos();
-	printf("Probando download 4\n");
-/*
-	sprintf(aux_data,"%s",buffer);
-
-	char archivo[TAM];
-	archivo = strtok(aux_data," ");
-	archivo[strlen(archivo)] = '\0';
-	printf("%s\n",archivo );
-*/
-	buffer[strlen(buffer)-1] = '\0';
-
-	char archivo[TAM];
-	char tamanio[TAM];
-
-	aux_data = strtok(buffer," ");
-
-	for(int32_t i=0; aux_data != NULL; i++){
-		if(i==0){
-			sprintf(archivo,"%s",aux_data);
-		}
-		else if(i==1){
-			sprintf(tamanio,"%s",aux_data);
-		}
-		aux_data = strtok(NULL," ");
-	}
-	//fflush(stdout);
-
-	printf("%s\n",archivo );
-	printf("%s\n",tamanio );
-	printf("Probando download 5\n");
-/*
-	char tamanio[TAM];
-	tamanio = strtok(aux_data," ");
-	archivo[strlen(archivo)] = '\0';
-	printf("%s\n",archivo );
-
-	aux_data = strtok(buffer, " ");
-	char tamanio[strlen(aux_data)];
-	sprintf(tamanio, "%s", aux_data);
-	tamanio[strlen(tamanio)] = '\0';
-	printf("%s\n",tamanio );
-*/
-	printf("Probando download 6\n");
-
-	float aux_size = strtof(tamanio,NULL);
-	float size = aux_size*BYTES_TO_MB;
-	//size[sizeof(size)] = ' ';
-	printf("%f\n",size );
-
-	//confirmar_files();
-
-	printf("Probando download 7\n");
-
-	printf("%sDescargando archivo%s\n",KGRN,KNRM );
-	FILE* file = fopen(PATH_USB, "wb+");	//escribe archivo y si no hay, lo crea
-	if(file != NULL){
-		ssize_t download=0;		//me sirve para saber cuanto descargo
-		while((n=recv(sockfil,buffer,sizeof(buffer),0))>0){
-			if(download == size){		//si matchea el tamaño con lo que descargo, freno
-				break;
-			}
-			fwrite(buffer,sizeof(char),(size_t)n,file);
-			download+=n;	//a medida que lee, aumento el tamaño para sacar el MD5
-		}
-		//size = ftell(file);
-		fclose(file);
-		shutdown(sockfd,SHUT_RDWR);
-		close(sockfil);
-
-		float aux=(float)download/BYTES_TO_MB;
-		printf("%sDescarga terminada: %f MB%s\n",KBLU,aux,KNRM);
-		fflush(stdout);
-	}
-	else{
-		printf("%sError descargando archivo%s\n",KRED,KNRM);
-		shutdown(sockfd,SHUT_RDWR);
-		exit(1);
-	}
-
-	//get_MD5(PATH_USB,buffer_aux);
-	//printf("%sHash del archivo: %s%s\n",KBLU,buffer_aux,KNRM);
-	
-
-/*
-	ssize_t size;
-	if(!strcmp(buffer,"connOk")){
-		printf("conectando\n");
-		//se obtine socket y se establece conexion
-		sockfil = socket( AF_INET, SOCK_STREAM, 0 );
-		if ( sockfil < 0 ) {
-			perror( "ERROR apertura de socket" );
-			exit( 1 );
-		}
-
-		if ( connect( sockfil, (struct sockaddr *)&serv_addr_file, sizeof(serv_addr_file ) ) < 0 ) {
-			perror( "conexion" );
-			exit( 1 );
-		}
-	}else{
-		return;
-	}
-
-	memset( buffer, 0, TAM );
-
-	printf("iniciando descarga\n");
-	//se abre el archivo destino con modo wb para la escritura
-	FILE* file = fopen( PATH_USB, "wb" );
-
-  	if(file != NULL) {
-		ssize_t readed=0;
-
-		while((size=recv(sockfil, buffer, sizeof(buffer), 0))> 0 ){
-			if(!(strcmp(buffer,"EOF")))
-				break;
-			fwrite(buffer, sizeof(char), (size_t) size, file);
-			readed+=size;
-		}
-		//se obtienen los datos una vez finalizada la descarga
-		//char filename[ARCHIVO_NAME_SIZE]=PATH_USB;
-		//char auxBuffer[ARCHIVO_NAME_SIZE];
-		printf("Descarga terminada: %ld Bytes\n",readed);
-		//get_MD5(filename,auxBuffer);
-		//sprintf("Hash MD5 <%s>\n",auxBuffer);
-		fclose(file);
-		//getMbr(auxBuffer);
-		//printf("Datos de la tabla de particiones MBR:\n%s",auxBuffer);
-		//se cierra la conexion
-		shutdown(sockfil,SHUT_RDWR);
-	}else {
-      	perror("error al descargar archivo\n");
-		exit(1);
-  	}*/
-
-}
 
 /*
 	Es lo mismo que connect_to_server, pero para file, 
@@ -552,20 +321,9 @@ void conect_to_files(){
 		perror( "ERROR apertura de socket" );
 		exit( 1 );
 	}
-	//memset( (char *) &serv_addr_file, '0', sizeof(serv_addr) );
-	//serv_addr_file.sin_family = AF_INET;
-	//bcopy( (char *)server->h_addr, (char *)&serv_addr_file.sin_addr.s_addr, (size_t)server->h_length );		// hay que castear server->h_length para que fucnione en bcopy
-	//serv_addr_file.sin_port = htons( (uint16_t)puerto2 );
 	if ( connect( sockfil, (struct sockaddr *)&serv_addr_file, sizeof(serv_addr_file ) ) < 0 ) {
 		perror( "conexion" );
 		exit( 1 );
 	}
 }
 
-void confirmar_files(){					
-	n = send( sockfil, "ok", strlen("ok"), 0 );
-	if ( n < 0 ) {
-	  perror( "error de envío\n");
-	  exit( 1 );
-	}
-}

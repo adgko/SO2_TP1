@@ -14,9 +14,7 @@ void validar_rta();
 void comandos();
 void enviar_comando();
 void leer_server();
-void write_usb();
-void little_to_big(char big[8], char little[4]);
-void show_mbr(char* );
+void escribir_usb();
 void recibir_respuesta(int32_t);
 void descargar();
 void conect_to_files();
@@ -40,12 +38,3 @@ int32_t auth_flag = 0;
 int32_t rta = 0;
 char* aux_data;
 
-struct mbr            /** Estructura para leer la tabla MBR. */
-{
-  char boot[1];       /** Indica si es 'booteable'. */
-  char start_chs[3];  /** Comienzo de CHS. */
-  char type[1];       /** Tipo de partición. */
-  char end_chs[3];    /** Final de CHS. */
-  char start[4];      /** Sector de arranque de la partición. */
-  char size[4];       /** Tamaño de la partición (en sectores). */
-} __attribute__((__packed__));

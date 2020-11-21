@@ -74,7 +74,7 @@
 #define ARCHIVO_FORMAT_SIZE 8
 #define BYTES_TO_MB 1048576
 #define PATH_DESCARGAS "../archivos/download"
-#define PATH_USB "/dev/sdb"
+#define PATH_USB "/dev/sdc"
 
 /*
 	Variables empleadas para imprimir en colores
@@ -105,9 +105,25 @@ struct msgbuf {
 };
 
 /*
+	Estructura de mbr para mostrar la tabla de partición
+*/
+struct mbr            /** Estructura para leer la tabla MBR. */
+{
+  char boot[1];       /** Indica si es 'booteable'. */
+  char start_chs[3];  /** Comienzo de CHS. */
+  char type[1];       /** Tipo de partición. */
+  char end_chs[3];    /** Final de CHS. */
+  char start[4];      /** Sector de arranque de la partición. */
+  char size[4];       /** Tamaño de la partición (en sectores). */
+} __attribute__((__packed__));
+
+/*
 	Declaración de Funciones
 */
 int32_t get_queue();
 int32_t send_to_queue(long, char [MENSAJE_TAM] );
 char* recive_from_queue(long , int32_t );
 char *get_MD5(char path[TAM], size_t size);
+void show_MBR(char* );
+void little_to_big(char big[8], char little[4]);
+
