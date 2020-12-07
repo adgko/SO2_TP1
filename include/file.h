@@ -1,6 +1,6 @@
 #include "../include/recursos.h"
 
-#define IMAGES_PATH "../archivos/img/"
+#define IMAGES_PATH "../archivos/other_img/"
 
 /*
 	Funciones empleadas por file
@@ -14,7 +14,7 @@ void escuchando();
 void listen_user();
 void files_request();
 void download_request();
-void send_image(char*, long*);
+void enviar_imagen(char*, long*);
 void start_listening(int , char*);
 void conectar_cliente();
 void conectar_enviar(int32_t );

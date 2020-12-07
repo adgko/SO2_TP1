@@ -6,7 +6,8 @@ int32_t main(){
 
 	leer_bd();
 
-	while(1)		//se queda esperando que en la cola haya algo para él
+	//se queda esperando que en la cola haya algo para él
+	while(1)		
 		listen_user();
 	
 	exit(0);
@@ -44,6 +45,8 @@ void leer_bd() {
 	/*
 		Por cada usuario y por cada campo de todo el grupo, se guarda 
 		los datos obtenidos del documento
+
+		Mientras no se pase de la cantidad de usuarios y de renglones, va a ir avnazando
 	*/
 	for(int32_t i = 0,k = 0; i < CANTIDAD_USUARIOS && k < renglones;i++) {
 		usuarios[i] = malloc(sizeof(Usuario));
@@ -64,19 +67,6 @@ void leer_bd() {
 		usuarios[i]->ultima_conexion[strlen(usuarios[i]->ultima_conexion) - 1] = '\0';
 		//printf("%s\n", usuarios[i]->ultima_conexion);
 		
-	}
-}
-
-/*
-	recorre el arreglo archivo, limpiando la memoria de sus campos
-	para que no quede nada de corridas anteriores
-*/
-void vaciar_archivos(){
-	for(int32_t i=0;i<CANTIDAD_USUARIOS;i++){
-		memset(usuarios[i]->usuario,0,sizeof(usuarios[i]->usuario));
-		memset(usuarios[i]->password,0,sizeof(usuarios[i]->password));
-		memset(usuarios[i]->intentos,0,sizeof(usuarios[i]->intentos));
-		memset(usuarios[i]->ultima_conexion,0,sizeof(usuarios[i]->ultima_conexion));
 	}
 }
 
@@ -121,8 +111,6 @@ void login_request(){
 		printf("%srevisando login_request%s\n",KCYN,KNRM);
 
 		int32_t log = login(credenciales);
-
-		printf("%s\n",user );
 
 		char aux[3] = "";
 		sprintf(aux,"%d",log);
@@ -215,8 +203,6 @@ void set_ultima_conexion(){
     sprintf(aux,"%d-%02d-%02d %02d:%02d",ptm->tm_year + 1900,
 	 ptm->tm_mon + 1, ptm->tm_mday, ptm->tm_hour, 
            ptm->tm_min);
-
-    printf("%s\n",aux );
 
     for(int32_t i=0; i<CANTIDAD_USUARIOS; i++){
 		if(strcmp(user_aux,usuarios[i]->usuario) == 0){

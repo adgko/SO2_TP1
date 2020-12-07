@@ -96,7 +96,7 @@ void configurar_socket() {
 	Abre conexión para que se conecte un clietne
 */
 void escuchando(){
-	listen(sockfd, 5);
+	listen(sockfd, 1);
 	client_len = sizeof(client_addr);
 }
 
@@ -175,11 +175,10 @@ void verificar_respuesta(){
 	Obtiene el comando a enviar y funciona como intermediario
 */
 void inter(){
+
 	buffer[strlen(buffer)-1]='\0'; //coloca un valor final al final del comando
 
-	/*
-	variables que usa para guardar comandos, opciones y argumentos
-	*/
+	//variables que usa para guardar comandos, opciones y argumentos
 	char* mensaje_comando;
 	char comando[COMANDO_TAM];
 	char opcion[COMANDO_TAM];
@@ -256,10 +255,10 @@ void user_command( char *opcion, char *argumento) {
 		user_passwd(argumento);
 	}
 	else {
-		enviar_a_cliente(	" Opción Incorrecta\n"
-							" Escriba: user [opcion] <argumento>\n"
-							"	- ls : listado de usuarios\n"
-							"	- passwd <nueva contraseña> : cambio de contraseña\n");
+		enviar_a_cliente(" Opción Incorrecta\n"
+						 " Escriba: user [opcion] <argumento>\n"
+							"		- ls : listado de usuarios\n"
+							"		- passwd <nueva contraseña> : cambio de contraseña\n");
 	}
 }
 
@@ -286,6 +285,7 @@ void user_ls() {
 */
 void user_passwd(char* clave) {
 
+	// valida la password
 	if( strlen(clave) < 5 || strlen(clave) > CLAVE_TAM) {
 		enviar_a_cliente("Clave invalida");
 		return;
@@ -298,8 +298,6 @@ void user_passwd(char* clave) {
 	free(cad_aux);
 	recive_from_queue((long) PASSWORD_CHANGE_RESPONSE, 0);
 	enviar_a_cliente("Clave cambiada con exito");
-
-	return;
 }
 
 /*

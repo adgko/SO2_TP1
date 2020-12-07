@@ -22,6 +22,8 @@ int main(int argc, char *argv[])
 	
 	while(1) {
 
+			signal(SIGINT, signal_handler);
+
 			/*
 				Si auth_flag es 0, no hay usuarios autenticados, por lo que pedirá credenciales hasta que encuentre alguno o se bloquee
 			*/
@@ -73,7 +75,9 @@ void conect_to_server()
 void signal_handler()
 {
 	struct sigaction sign;
+	sigemptyset(&sign.sa_mask);
 	sign.sa_handler = salida;
+	sign.sa_flags = 0;
 	sigaction(SIGINT, &sign,  NULL);
 }
 void salida() {								
@@ -167,7 +171,7 @@ void validar_rta(){
 void comandos(){
 	while(1){
 		memset(buffer, 0, TAM);			// con esto limpio el buffer del comando anterior
-		printf("$");
+		printf("%s$%s",KCYN,KNRM);
 		fgets(buffer,TAM,stdin); 			// pido comando
 		if(buffer[0] != '\n'){				//si en el buffer no hay una nueva linea, envía
 			if(strcmp(buffer, "exit\n") == 0){	//si se escribe "exit", cierra sesión y cierra el programa
@@ -201,7 +205,7 @@ void enviar_comando(){
 void leer_server(){
 	if(buffer[0] != '\0'){		//por si el mensaje es nulo
 
-		printf("recibiendo respuesta\n");
+		printf("%sRecibiendo respuesta%s\n",KBLU,KNRM);
 		recibir_respuesta(sockfd);
 
 		if(strcmp(buffer, "descarga_no") == 0){
@@ -213,7 +217,7 @@ void leer_server(){
         												// Esto se debe a que el server envía Download tamaño y hash MD5
         	conect_to_files();							
 
-        	printf("%sEscribiendo USB %s%s\n", KGRN,PATH_USB,KNRM);
+        	printf("%sEscribiendo USB %s%s\n", KBLU,PATH_USB,KNRM);
 
         	escribir_usb();
 
@@ -249,22 +253,22 @@ void escribir_usb()
   size_t size = 0;
   size_t md5_aux;
 
-  /*
-	Almaceno el tamaño que recibo para poder calcular el MD5
-  */	
+  //Almaceno el tamaño que recibo para poder calcular el MD5	
   sscanf(tok, "%lud", &size);
   md5_aux = size;
 
-  /*
-	Almaceno el MD5 que me llegó para compararlo luego
-  */
+  //Almaceno el MD5 que me llegó para compararlo luego
   char md5_recv[MD5_DIGEST_LENGTH*2+1];
   tok = strtok(NULL, " ");
   sprintf(md5_recv, "%s", tok);
 
+  // para calcular cuando tiempo dura
+  clock_t start, end;
+  double cpu_time_used;
+  start = clock();
+
   FILE *usb;
   usb = fopen(PATH_USB, "wb");
-
   if(usb == NULL)
     {
       perror("open usb");
@@ -272,10 +276,9 @@ void escribir_usb()
     }
 
   	// lo que recibe, se escribe en un archivo en el pendrive
-  	/*
-		Se emplea un bucle do while para asegurar que se cumple al menos una vez el ciclo
-		y luego comprueba en cada iteración
-  	*/
+	//Se emplea un bucle do while para asegurar que se cumple al menos una vez el ciclo
+	//y luego comprueba en cada iteración
+	//mientras haya datos (amaño que le envió el file) va a recibir y escribir en el usb
   do
     {
       n = recv(sockfil, buffer, TAM, 0);
@@ -292,21 +295,31 @@ void escribir_usb()
   sync();			// se emplea sync porque sino se pisa el buffer cuando envío más comandos
   fclose(usb);
 
-  printf("%sEscritura de USB terminada %s\n",KGRN,KNRM);
+  printf("%sEscritura de USB terminada%s\n",KGRN,KNRM);
+
+  /// para calcular cuanto dura
+	end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	int h,m,s;
+	h = (int)(cpu_time_used/3600);
+	m = (int)(cpu_time_used -(3600*h))/60;
+	s = (int)(cpu_time_used -(3600*h)-(m*60));
+	printf("%sla escritura duró %d horas, %d minutos y %d segundos %s\n", KBLU, h, m, s, KNRM);
+
 
   char *md5 = get_MD5(PATH_USB, md5_aux);
 
-  /*
-	si los MD5 matchean, puedo marcar que fue exitosa y mostrar MBR
-	si no, se dirá que falló
-  */
+
+	//si los MD5 matchean, puedo marcar que fue exitosa y mostrar MBR
+	//si no, se dirá que falló
+
   if(!strcmp(md5_recv, md5))
     {
-      printf("Escritura exitosa.\n");
-      show_MBR(PATH_USB);
+      printf("%sEscritura exitosa%s\n",KGRN,KNRM);
+      get_MBR();
     }
   else
-    printf("Escritura fallida.\n");
+    printf("%sEscritura fallida%s\n",KRED,KNRM);
 }
 
 
